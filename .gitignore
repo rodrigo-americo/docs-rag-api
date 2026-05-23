@@ -1,0 +1,13 @@
+# .gitignore  (versão atualizada — adicionar essas linhas)
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/cassettes/
+.idea/
+.vscode/
+
+# NÃO ignore uv.lock — ele vai pro git, é o que garante reprodutibilidade.
