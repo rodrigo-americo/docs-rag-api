@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-NetTCPConnection -LocalPort 5432 -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess | ForEach-Object { $_ | Add-Member -NotePropertyName ProcessName -NotePropertyValue \\(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue\\).ProcessName -PassThru })"
+    ]
+  }
+}

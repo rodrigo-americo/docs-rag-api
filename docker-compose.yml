@@ -15,7 +15,7 @@ services:
       # Expor no host pra FastAPI rodando fora do compose (modo dev) conectar
       # em localhost:5432. Quando o app for containerizado, ele usa o hostname
       # `postgres` na rede interna e essa exposição vira opcional.
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       # Volume nomeado: sobrevive a `docker compose down`.
       # Pra wipe limpo: `docker compose down -v` (note o -v).

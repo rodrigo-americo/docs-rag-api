@@ -1,0 +1,7 @@
+# .gitattributes
+# Força line endings consistentes — evita warning de CRLF em Windows
+# e divergência entre dev em Windows e CI em Linux.
+
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
