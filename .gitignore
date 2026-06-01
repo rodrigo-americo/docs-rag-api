@@ -9,5 +9,6 @@ __pycache__/
 tests/cassettes/
 .idea/
 .vscode/
+.claude/
 
 # NÃO ignore uv.lock — ele vai pro git, é o que garante reprodutibilidade.
