@@ -1,24 +1,29 @@
+# app/main.py
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import documents, health
 from app.core.config import settings
 from app.core.db import engine
+from app.core.logging import configure_logging, get_logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Gerencia recursos pelo ciclo de vida da aplicação.
-
-    Startup: nada agora (engine é instanciado no import).
-    Shutdown: disposa o pool de conexões do engine.
-    """
+    # Startup: configura logging ANTES de qualquer outra coisa.
+    configure_logging()
+    log = get_logger(__name__)
+    log.info(
+        "app.startup",
+        version=settings.app_version,
+        embedding_provider=settings.embedding_provider,
+        log_format=settings.log_format,
+    )
     yield
-    # Shutdown: fecha o pool de conexões. Sem isso, em SIGTERM
-    # rápido o pool não devolve conexões, e o banco vê elas como
-    # "idle in transaction" até o timeout do Postgres.
+    # Shutdown
+    log.info("app.shutdown")
     await engine.dispose()
 
 
@@ -30,3 +35,4 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(documents.router)

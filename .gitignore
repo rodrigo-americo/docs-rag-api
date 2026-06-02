@@ -10,5 +10,5 @@ tests/cassettes/
 .idea/
 .vscode/
 .claude/
-
+scope.md
 # NÃO ignore uv.lock — ele vai pro git, é o que garante reprodutibilidade.

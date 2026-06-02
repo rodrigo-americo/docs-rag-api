@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 5
     retrieval_quality_threshold: float = 0.7
 
+    # --- Logging ---
+    log_level: str = "INFO"
+    log_format: Literal["json", "console"] = "console"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url_sync(self) -> str:

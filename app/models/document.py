@@ -57,7 +57,7 @@ class Chunk(Base):
 
     # Atributo "metadata_" para evitar conflito com SQLAlchemy.MetaData.
     metadata_: Mapped[dict] = mapped_column(
-        "metadata",
+        "metadata_",
         JSONB,
         server_default="{}",
         nullable=False,
