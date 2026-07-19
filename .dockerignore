@@ -1,0 +1,14 @@
+.venv
+.git
+.github
+.claude
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.env
+.env.*
+!.env.example
+scope.md
+*.md
+!README.md

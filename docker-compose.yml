@@ -12,9 +12,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # Expor no host pra FastAPI rodando fora do compose (modo dev) conectar
-      # em localhost:5432. Quando o app for containerizado, ele usa o hostname
-      # `postgres` na rede interna e essa exposição vira opcional.
+      # Expor no host permite conectar em localhost:5433 com um client externo
+      # (psql, DBeaver) ou rodar a API fora do compose. O serviço `api` abaixo
+      # não usa esta porta — ele fala com `postgres:5432` na rede interna.
       - "5433:5432"
     volumes:
       # Volume nomeado: sobrevive a `docker compose down`.
@@ -29,6 +29,31 @@ services:
       retries: 10
       start_period: 10s
     shm_size: 256mb
+
+  api:
+    build: .
+    container_name: docs-rag-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Sobrepõe o DATABASE_URL do .env (que aponta pra localhost:5433, pra
+      # uso fora do compose) — dentro da rede interna o Postgres é acessível
+      # pelo hostname do serviço, na porta padrão 5432.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Aplica migrations pendentes antes de subir o servidor. Simples e
+    # suficiente pro estágio atual (single instance); em múltiplas réplicas
+    # isso viraria um job separado pra evitar migrations concorrentes.
+    # --frozen --no-sync: usa exatamente o ambiente já montado no build,
+    # sem essa instalar o grupo dev (ruff, pytest) na imagem de produção.
+    command: >
+      sh -c "uv run --frozen --no-sync alembic upgrade head &&
+             uv run --frozen --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 volumes:
   postgres_data:
