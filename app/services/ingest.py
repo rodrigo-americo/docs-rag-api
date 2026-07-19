@@ -1,18 +1,20 @@
-from __future__ import annotations
 import time
-from app.core.logging import get_logger
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import (
     DocumentTooLargeError,
     DocumentTooManyPagesError,
+    DuplicateChunkError,
+    EmptyDocumentError,
     UnsupportedFileTypeError,
 )
+from app.core.logging import get_logger
 from app.models.document import Chunk, Document
 from app.services.chunking import chunk_text
 from app.services.embedding import EmbeddingProvider
@@ -73,14 +75,12 @@ class IngestService:
         elif suffix in (".md", ".markdown", ".txt"):
             text = content.decode("utf-8", errors="replace")
         else:
-            raise UnsupportedFileTypeError(
-                f"Extensão {suffix!r} não suportada (use .pdf, .md ou .txt)"
-            )
+            raise UnsupportedFileTypeError(suffix)
 
         # 3. Chunking (CPU local, rápido).
         chunks_data = chunk_text(text)
         if not chunks_data:
-            raise UnsupportedFileTypeError("Documento sem conteúdo após chunking")
+            raise EmptyDocumentError(filename)
         # 4. Embedding em batch — FORA da transação. API externa nunca
         #    dentro de lock de banco.
         log.info(
@@ -127,7 +127,12 @@ class IngestService:
         )
         # Flush força INSERT mas NÃO commita — útil pra pegar erros de
         # constraint cedo, antes do commit do request.
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            # Cobre a unique constraint (document_id, chunk_index) — só
+            # alcançável por retry ou corrida, nunca por input do cliente.
+            raise DuplicateChunkError(filename) from exc
 
         return IngestResult(
             document_id=document.id,

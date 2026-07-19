@@ -5,16 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db_session
-from app.core.exceptions import (
-    DocumentTooLargeError,
-    DocumentTooManyPagesError,
-    UnsupportedFileTypeError,
-)
+from app.core.exceptions import DocumentTooLargeError, IngestError
+from app.core.logging import get_logger
 from app.schemas.documents import IngestResponse
 from app.services.embedding import EmbeddingProvider, get_embedding_provider
 from app.services.ingest import IngestService
-from app.services.pdf_parser import PdfParseError
-from app.core.logging import get_logger
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -56,25 +51,12 @@ async def ingest_document(
             size_bytes=exc.size_bytes,
             max_bytes=exc.max_bytes,
         )
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=str(exc),
-        ) from exc
-    except DocumentTooManyPagesError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=str(exc),
-        ) from exc
-    except UnsupportedFileTypeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=str(exc),
-        ) from exc
-    except PdfParseError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
+        raise exc.to_http() from exc
+    except IngestError as exc:
+        # Catch-all: qualquer subclasse de IngestError já carrega seu próprio
+        # status_code (ver app/core/exceptions.py). Novas exceções de ingest
+        # não exigem tocar neste endpoint.
+        raise exc.to_http() from exc
 
     return IngestResponse(
         document_id=result.document_id,
