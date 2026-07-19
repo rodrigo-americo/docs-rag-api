@@ -2,7 +2,7 @@ import logging
 import sys
 
 import structlog
-from structlog.types import EventDict, Processor
+from structlog.types import Processor
 
 from app.core.config import settings
 

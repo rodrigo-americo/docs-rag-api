@@ -1,7 +1,9 @@
 # scripts/check_db.py
 """Smoke test: confirma que conexão async funciona."""
 import asyncio
+
 from sqlalchemy import text
+
 from app.core.db import engine
 
 

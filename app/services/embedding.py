@@ -4,6 +4,7 @@ from typing import Protocol
 import numpy as np
 
 from app.core.config import settings
+from app.models.document import EMBEDDING_DIM
 
 
 class EmbeddingProvider(Protocol):
@@ -32,7 +33,7 @@ class FakeEmbeddingProvider:
     provider real.
     """
 
-    def __init__(self, dim: int = 1536) -> None:
+    def __init__(self, dim: int = EMBEDDING_DIM) -> None:
         self.dim = dim
 
     def _embed_one(self, text: str) -> list[float]:
@@ -87,4 +88,4 @@ def get_embedding_provider() -> EmbeddingProvider:
             api_key=settings.openai_api_key,
             model=settings.openai_embedding_model,
         )
-    return FakeEmbeddingProvider(dim=settings.openai_embedding_dim)
+    return FakeEmbeddingProvider()

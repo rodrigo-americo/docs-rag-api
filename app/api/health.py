@@ -6,8 +6,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import engine
+from app.core.logging import get_logger
 
 router = APIRouter(tags=["health"])
+
+log = get_logger(__name__)
 
 
 class HealthResponse(BaseModel):
@@ -60,7 +63,9 @@ async def ready(
         checks["database"] = "ok"
     except Exception as exc:
         # Capturamos ampla porque qualquer falha aqui é "banco indisponível"
-        # do ponto de vista do probe. Tipo exato vai pro log do app.
+        # do ponto de vista do probe. Resposta HTTP só leva o nome da classe
+        # (evita vazar detalhes de conexão); mensagem completa vai pro log.
+        log.warning("ready.database_check_failed", error=str(exc))
         checks["database"] = f"fail: {type(exc).__name__}"
 
     all_ok = all(v == "ok" for v in checks.values())

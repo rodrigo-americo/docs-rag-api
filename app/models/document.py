@@ -2,13 +2,19 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, Index, Integer, Text
+from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.core.db import Base
-from app.core.config import settings
+
+# 1536 = dimensão de text-embedding-3-small. Hardcoded intencionalmente
+# (espelha a migration): mudar o modelo de embedding é decisão arquitetural
+# que exige nova migração, nunca uma env var — outros módulos que precisem
+# dessa dimensão (ex: FakeEmbeddingProvider) devem importar esta constante,
+# não duplicar o valor.
+EMBEDDING_DIM = 1536
 
 
 class Document(Base):
@@ -37,6 +43,13 @@ class Document(Base):
 
 class Chunk(Base):
     __tablename__ = "chunks"
+    __table_args__ = (
+        # Garante no banco o invariante que o ingest já assume: cada posição
+        # de chunk aparece uma única vez por documento. Sem isso, um retry
+        # duplicado ou um futuro segundo caminho de escrita corrompe
+        # silenciosamente a ordem reconstruída do documento.
+        UniqueConstraint("document_id", "chunk_index", name="uq_chunks_document_id_chunk_index"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -51,7 +64,7 @@ class Chunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(
-        Vector(settings.openai_embedding_dim),
+        Vector(EMBEDDING_DIM),
         nullable=False,
     )
 
