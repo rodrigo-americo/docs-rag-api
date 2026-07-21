@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import documents, health
+from app.api import documents, health, query
 from app.core.config import settings
 from app.core.db import engine
 from app.core.logging import configure_logging, get_logger
@@ -36,3 +36,4 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(documents.router)
+app.include_router(query.router)

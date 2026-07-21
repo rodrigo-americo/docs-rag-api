@@ -27,7 +27,9 @@ class IngestResult:
     title: str
     chunks_created: int
 
+
 log = get_logger(__name__)
+
 
 class IngestService:
     """Serviço de ingest. Recebe dependências via construtor pra ser

@@ -12,6 +12,7 @@ class TextChunk:
     `index` é a posição original — preservada pra reconstruir ordem
     do documento se algum dia for útil (citation com page hint, etc).
     """
+
     index: int
     content: str
 

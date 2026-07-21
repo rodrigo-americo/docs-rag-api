@@ -23,9 +23,7 @@ class DocumentTooLargeError(IngestError):
     def __init__(self, size_bytes: int, max_bytes: int) -> None:
         self.size_bytes = size_bytes
         self.max_bytes = max_bytes
-        super().__init__(
-            f"Arquivo de {size_bytes} bytes excede limite de {max_bytes} bytes"
-        )
+        super().__init__(f"Arquivo de {size_bytes} bytes excede limite de {max_bytes} bytes")
 
 
 class DocumentTooManyPagesError(IngestError):
@@ -36,9 +34,7 @@ class DocumentTooManyPagesError(IngestError):
     def __init__(self, pages: int, max_pages: int) -> None:
         self.pages = pages
         self.max_pages = max_pages
-        super().__init__(
-            f"PDF de {pages} páginas excede limite de {max_pages}"
-        )
+        super().__init__(f"PDF de {pages} páginas excede limite de {max_pages}")
 
 
 class UnsupportedFileTypeError(IngestError):
@@ -48,9 +44,7 @@ class UnsupportedFileTypeError(IngestError):
 
     def __init__(self, extension: str) -> None:
         self.extension = extension
-        super().__init__(
-            f"Extensão {extension!r} não suportada (use .pdf, .md ou .txt)"
-        )
+        super().__init__(f"Extensão {extension!r} não suportada (use .pdf, .md ou .txt)")
 
 
 class EmptyDocumentError(IngestError):

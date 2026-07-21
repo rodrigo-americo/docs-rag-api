@@ -1,13 +1,15 @@
-# app/api/documents.py
-"""Endpoint /documents — thin, delega tudo pra IngestService."""
+import uuid
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db_session
 from app.core.exceptions import DocumentTooLargeError, IngestError
 from app.core.logging import get_logger
-from app.schemas.documents import IngestResponse
+from app.models.document import Document
+from app.schemas.documents import DocumentSummary, IngestResponse
 from app.services.embedding import EmbeddingProvider, get_embedding_provider
 from app.services.ingest import IngestService
 
@@ -15,9 +17,52 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 log = get_logger(__name__)
 
+
 def get_embedding() -> EmbeddingProvider:
     """Dependency pra injetar o embedding provider — facilita override em testes."""
     return get_embedding_provider()
+
+
+@router.get(
+    "",
+    response_model=list[DocumentSummary],
+    summary="Lista de documentos indexados",
+)
+async def list_documents(
+    session: AsyncSession = Depends(get_db_session),
+) -> list[DocumentSummary]:
+    stmt = select(Document).order_by(Document.created_at.desc())
+    result = await session.execute(stmt)
+    documents = result.scalars().all()
+
+    return [
+        DocumentSummary(
+            id=doc.id,
+            title=doc.title,
+            source_filename=doc.source_filename,
+            created_at=doc.created_at,
+        )
+        for doc in documents
+    ]
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove um documento e seus chunks",
+)
+async def delete_document(
+    document_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    document = await session.get(Document, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento {document_id} não encontrado",
+        )
+
+    await session.delete(document)
 
 
 @router.post(

@@ -12,7 +12,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     app_version: str = "0.1.0"
-    database_url: str = Field(..., description="URL do Postgres com driver async (postgresql+asyncpg)")
+    database_url: str = Field(
+        ..., description="URL do Postgres com driver async (postgresql+asyncpg)"
+    )
 
     # --- OpenAI ---
     # Vazia por padrão: só é obrigatória quando embedding_provider="openai"
@@ -24,14 +26,18 @@ class Settings(BaseSettings):
 
     # --- Provider switch ---
     # "fake" pra dev/teste sem custo. "openai" quando tiver chave.
+    # Independentes: permite testar o /query (rewrite + generate) em modo
+    # fake sem precisar reingerir documentos, mesmo com embeddings reais
+    # já no banco — e vice-versa.
     embedding_provider: Literal["openai", "fake"] = "fake"
+    chat_provider: Literal["openai", "fake"] = "fake"
 
     @model_validator(mode="after")
     def _require_openai_key_when_selected(self) -> "Settings":
         if self.embedding_provider == "openai" and not self.openai_api_key:
-            raise ValueError(
-                "OPENAI_API_KEY é obrigatória quando EMBEDDING_PROVIDER=openai."
-            )
+            raise ValueError("OPENAI_API_KEY é obrigatória quando EMBEDDING_PROVIDER=openai.")
+        if self.chat_provider == "openai" and not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY é obrigatória quando CHAT_PROVIDER=openai.")
         return self
 
     langsmith_tracing: bool = False
@@ -45,6 +51,11 @@ class Settings(BaseSettings):
 
     retrieval_top_k: int = 5
     retrieval_quality_threshold: float = 0.7
+    # Se a 1ª reformulação não melhorou o retrieval o suficiente, é mais
+    # provável que a informação não esteja nos documentos do que uma 2ª
+    # reformulação achar algo que a 1ª não achou — melhor responder "não
+    # encontrei" do que fazer o usuário esperar mais rodadas de LLM.
+    max_rewrite_attempts: int = 2
 
     # --- Logging ---
     log_level: str = "INFO"

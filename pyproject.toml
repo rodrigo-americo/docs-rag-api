@@ -85,3 +85,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011"]  # `assert False` é ok em testes
+
+[tool.ruff.format]
+# Default do ruff format (estilo black): aspas duplas, indent de 4 espaços,
+# trailing commas normalizadas. Sem overrides — o default já é o que o
+# projeto vinha tentando seguir manualmente.
