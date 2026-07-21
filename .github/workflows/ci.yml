@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg16-bookworm
+        env:
+          POSTGRES_USER: docsrag
+          POSTGRES_PASSWORD: docsrag
+          POSTGRES_DB: docsrag
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docsrag -d docsrag"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://docsrag:docsrag@localhost:5432/docsrag
+      EMBEDDING_PROVIDER: fake
+      CHAT_PROVIDER: fake
+      OPENAI_API_KEY: ""
+      LOG_FORMAT: json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Run migrations
+        run: uv run alembic upgrade head
+
+      - name: Run tests
+        run: uv run pytest
