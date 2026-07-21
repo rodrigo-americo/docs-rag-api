@@ -30,6 +30,7 @@ dependencies = [
     "langchain-text-splitters>=1.0,<2.0",  # RecursiveCharacterTextSplitter
     "langgraph>=1.0,<2.0",
     "langsmith>=0.4,<1.0",                 # Tracing — auto-detectado via env vars
+    "openai>=2.0,<3.0",                    # usado direto em ingest.py pra capturar OpenAIError
     # --- Parsing ---
     "pypdf>=5.1,<6.0",
     "psycopg[binary]>=3.2,<4.0",

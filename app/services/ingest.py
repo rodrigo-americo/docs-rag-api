@@ -3,6 +3,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from openai import OpenAIError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from app.core.exceptions import (
     DocumentTooLargeError,
     DocumentTooManyPagesError,
     DuplicateChunkError,
+    EmbeddingProviderError,
     EmptyDocumentError,
     UnsupportedFileTypeError,
 )
@@ -92,7 +94,15 @@ class IngestService:
         )
         embed_start = time.perf_counter()
         contents = [c.content for c in chunks_data]
-        embeddings = await self._embedding.embed_texts(contents)
+        try:
+            embeddings = await self._embedding.embed_texts(contents)
+        except OpenAIError as exc:
+            log.warning(
+                "ingest.embedding_failed",
+                filename=filename,
+                error=str(exc),
+            )
+            raise EmbeddingProviderError(str(exc)) from exc
         log.info(
             "ingest.embedding_done",
             filename=filename,

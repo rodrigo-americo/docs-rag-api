@@ -1,3 +1,41 @@
+import httpx
+from openai import APIConnectionError
+
+from app.api.documents import get_embedding
+from app.main import app
+
+
+class _FailingEmbeddingProvider:
+    """Simula a OpenAI caindo no meio do embedding — mesma forma de erro
+    que o SDK real levanta (subclasse de openai.OpenAIError)."""
+
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        raise APIConnectionError(
+            request=httpx.Request("POST", "https://api.openai.com/v1/embeddings")
+        )
+
+    async def embed_query(self, text: str) -> list[float]:
+        raise APIConnectionError(
+            request=httpx.Request("POST", "https://api.openai.com/v1/embeddings")
+        )
+
+
+async def test_ingest_returns_503_when_embedding_provider_fails(client, sample_txt_bytes):
+    app.dependency_overrides[get_embedding] = lambda: _FailingEmbeddingProvider()
+    try:
+        response = await client.post(
+            "/documents/ingest",
+            files={"file": ("contrato.txt", sample_txt_bytes, "text/plain")},
+        )
+    finally:
+        del app.dependency_overrides[get_embedding]
+
+    assert response.status_code == 503
+
+    list_response = await client.get("/documents")
+    assert list_response.json() == []
+
+
 async def test_ingest_txt_succeeds(client, sample_txt_bytes):
     response = await client.post(
         "/documents/ingest",

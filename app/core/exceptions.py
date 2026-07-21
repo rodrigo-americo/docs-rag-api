@@ -67,6 +67,21 @@ class PdfParseError(IngestError):
         super().__init__(f"Falha ao processar PDF: {reason}")
 
 
+class EmbeddingProviderError(IngestError):
+    """Provider de embeddings (ex: OpenAI) falhou ou está indisponível.
+
+    503, não 500: não é um bug interno, é uma dependência externa fora do
+    ar. O cliente pode tentar de novo mais tarde — diferente de um 500,
+    que sugere um bug que só será corrigido com deploy.
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"Serviço de embeddings indisponível: {reason}")
+
+
 class DuplicateChunkError(IngestError):
     """Violação da unique constraint (document_id, chunk_index).
 
