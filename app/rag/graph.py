@@ -63,7 +63,9 @@ def make_generate_node(chat_provider: ChatProvider) -> Callable:
 
         prompt = (
             f"Responda a pergunta usando APENAS o contexto abaixo. "
-            f"Se o contexto não contiver a informação necessária, diga que não sabe.\n\n"
+            f"Se o contexto não contiver a informação necessária, diga que não sabe. "
+            f"Não calcule nem combine números de trechos diferentes — cite os valores "
+            f"e regras exatamente como aparecem no contexto, sem fazer contas.\n\n"
             f"Contexto:\n{context}\n\n"
             f"Pergunta: {question}"
         )

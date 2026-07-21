@@ -44,10 +44,12 @@ def _count_tokens(text: str) -> int:
 @dataclass
 class QueryTrace:
     question: str
-    expected_chunk_id: str
+    expected_chunk_id: str | None
+    out_of_scope: bool
     retrieved_chunk_ids: list[str]
     answer: str
     context: str
+    retry_count: int
     latency_seconds: float
     input_tokens: int
     output_tokens: int
@@ -75,7 +77,9 @@ RESPOSTA:
 NOTA:"""
 
 
-async def _run_single_query(question: str, expected_chunk_id: str) -> QueryTrace:
+async def _run_single_query(
+    question: str, expected_chunk_id: str | None, out_of_scope: bool
+) -> QueryTrace:
     embedding_provider = get_embedding_provider()
     chat_provider = get_chat_provider()
 
@@ -106,9 +110,11 @@ async def _run_single_query(question: str, expected_chunk_id: str) -> QueryTrace
     return QueryTrace(
         question=question,
         expected_chunk_id=expected_chunk_id,
+        out_of_scope=out_of_scope,
         retrieved_chunk_ids=[str(c.chunk_id) for c in final_state["citations"]],
         answer=answer,
         context=context,
+        retry_count=final_state["retry_count"],
         latency_seconds=latency,
         input_tokens=_count_tokens(context) + _count_tokens(question),
         output_tokens=_count_tokens(answer),
@@ -134,6 +140,16 @@ def _recall_at_k(trace: QueryTrace) -> bool:
     return trace.expected_chunk_id in trace.retrieved_chunk_ids
 
 
+REFUSAL_MARKERS = ("não sei", "não encontrei", "não há informação", "não consta", "não possuo")
+
+
+def _correctly_refused(trace: QueryTrace) -> bool:
+    """Só faz sentido pra perguntas out_of_scope: o grafo deveria reconhecer
+    que a informação não está nos documentos em vez de inventar uma resposta."""
+    answer_lower = trace.answer.lower()
+    return any(marker in answer_lower for marker in REFUSAL_MARKERS)
+
+
 async def main() -> None:
     if settings.embedding_provider != "openai" or settings.chat_provider != "openai":
         raise SystemExit(
@@ -147,18 +163,40 @@ async def main() -> None:
 
     traces: list[QueryTrace] = []
     for i, item in enumerate(dataset, start=1):
-        trace = await _run_single_query(item["question"], item["expected_chunk_id"])
+        out_of_scope = item.get("out_of_scope", False)
+        trace = await _run_single_query(
+            item["question"], item.get("expected_chunk_id"), out_of_scope
+        )
         traces.append(trace)
-        hit = "OK" if _recall_at_k(trace) else "MISS"
-        print(f"[{i}/{len(dataset)}] {hit} ({trace.latency_seconds:.2f}s) {item['question']}")
+
+        if out_of_scope:
+            hit = "OK" if _correctly_refused(trace) else "MISS"
+        else:
+            hit = "OK" if _recall_at_k(trace) else "MISS"
+        rewrite_tag = f" [rewrite x{trace.retry_count}]" if trace.retry_count > 0 else ""
+        print(
+            f"[{i}/{len(dataset)}] {hit} ({trace.latency_seconds:.2f}s){rewrite_tag} "
+            f"{item['question']}"
+        )
+
+    answerable_traces = [t for t in traces if not t.out_of_scope]
+    out_of_scope_traces = [t for t in traces if t.out_of_scope]
+
+    recall_hits = sum(_recall_at_k(t) for t in answerable_traces)
+    recall_at_5 = recall_hits / len(answerable_traces)
+
+    rewrite_triggers = sum(1 for t in traces if t.retry_count > 0)
+
+    refusal_hits = sum(_correctly_refused(t) for t in out_of_scope_traces)
+    refusal_rate = refusal_hits / len(out_of_scope_traces) if out_of_scope_traces else None
 
     print("\nJulgando faithfulness com LLM-juiz...")
-    faithfulness_scores = await asyncio.gather(*[_judge_faithfulness(t) for t in traces])
-
-    recall_hits = sum(_recall_at_k(t) for t in traces)
-    recall_at_5 = recall_hits / len(traces)
-
-    avg_faithfulness = statistics.mean(faithfulness_scores)
+    # Faithfulness só faz sentido pra respostas que tentaram afirmar algo com
+    # base no contexto — uma recusa correta ("não sei") não é "infiel", é o
+    # comportamento certo, e o LLM-juiz penalizaria injustamente com nota 0.
+    scored_traces = [t for t in traces if not _correctly_refused(t)]
+    faithfulness_scores = await asyncio.gather(*[_judge_faithfulness(t) for t in scored_traces])
+    avg_faithfulness = statistics.mean(faithfulness_scores) if faithfulness_scores else None
 
     latencies = sorted(t.latency_seconds for t in traces)
     p50 = statistics.median(latencies)
@@ -176,11 +214,20 @@ async def main() -> None:
     avg_cost_per_query = total_cost / len(traces)
 
     print("\n--- Resultado ---")
-    print(f"Recall@5:          {recall_at_5:.0%} ({recall_hits}/{len(traces)})")
-    print(f"Faithfulness:      {avg_faithfulness:.2f}")
-    print(f"Latência p50:      {p50:.2f}s")
-    print(f"Latência p95:      {p95:.2f}s")
-    print(f"Custo médio/query: US$ {avg_cost_per_query:.5f}")
+    print(f"Recall@5:              {recall_at_5:.0%} ({recall_hits}/{len(answerable_traces)})")
+    print(f"Rewrite disparado:     {rewrite_triggers}/{len(traces)} perguntas")
+    if refusal_rate is not None:
+        print(
+            f"Recusa correta (OOS):  {refusal_rate:.0%} ({refusal_hits}/{len(out_of_scope_traces)})"
+        )
+    if avg_faithfulness is not None:
+        print(
+            f"Faithfulness:          {avg_faithfulness:.2f} "
+            f"(sobre {len(scored_traces)} respostas não-recusa)"
+        )
+    print(f"Latência p50:          {p50:.2f}s")
+    print(f"Latência p95:          {p95:.2f}s")
+    print(f"Custo médio/query:     US$ {avg_cost_per_query:.5f}")
 
 
 if __name__ == "__main__":

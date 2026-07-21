@@ -135,27 +135,46 @@ Ganho marginal do semantic chunking não justifica a complexidade no MVP. O base
 
 ## Avaliação
 
-Dataset: 20 perguntas sobre 3 documentos sintéticos (contrato de serviço,
+Dataset: 26 perguntas sobre 3 documentos sintéticos (contrato de serviço,
 política de reembolso, manual de onboarding) com `expected_chunk_id`.
+22 perguntas têm resposta nos documentos (algumas com vocabulário
+propositalmente distante do texto original, para forçar o branch de
+rewrite do grafo); 4 são propositalmente fora de escopo — informação que
+não existe em nenhum documento — para medir se o sistema reconhece que
+não sabe em vez de inventar uma resposta.
 
 | Métrica | Resultado |
 |---------|-----------|
-| Recall@5 | 100% (20/20) |
-| Faithfulness | 1.00 |
-| Latência p50 | 3.95s |
-| Latência p95 | 8.50s |
+| Recall@5 (perguntas respondíveis) | 100% (22/22) |
+| Rewrite disparado | 17/26 perguntas |
+| Recusa correta (fora de escopo) | 100% (4/4) |
+| Faithfulness | 0.95 (21 respostas não-recusa) |
+| Latência p50 | 3.87s |
+| Latência p95 | 6.87s |
 | Custo médio / query | US$ 0.00010 |
 
 Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=150` tokens
 (reduzido só para a avaliação — os documentos sintéticos são curtos demais
 para gerar múltiplos chunks com o `chunk_size=700` padrão). Faithfulness
 avaliada por um segundo LLM-juiz, dado o contexto recuperado e a resposta
-gerada.
+gerada, e calculada apenas sobre respostas que tentaram afirmar algo com
+base no contexto — uma recusa correta ("não sei") não é falta de fidelidade,
+é o comportamento esperado, e incluí-la penalizaria a métrica injustamente.
+O valor oscila cerca de ±0.02 entre execuções: o juiz é o próprio
+`gpt-4o-mini`, e LLM-as-judge não é determinístico — a mesma resposta
+correta ocasionalmente recebe 0.5 em vez de 1.0 numa pergunta de fronteira.
+Isso é ruído de medição, não um bug do sistema avaliado.
+
+O prompt de geração também instrui o modelo a não combinar números de
+trechos diferentes (ex: taxa de multa de um chunk + valor total de outro) —
+LLMs erram aritmética com frequência maior do que aparentam, e esse tipo de
+inferência silenciosa é mais difícil de auditar do que citar os valores
+como aparecem no texto.
 
 Para rodar a avaliação (requer `EMBEDDING_PROVIDER=openai` e
 `CHAT_PROVIDER=openai` no `.env`, com uma `OPENAI_API_KEY` real):
 
 ```bash
-uv run python -m evals.setup_dataset   # ingere os documentos uma vez
-uv run python -m evals.run_eval
+CHUNK_SIZE=150 uv run python -m evals.setup_dataset   # ingere os documentos uma vez
+CHUNK_SIZE=150 uv run python -m evals.run_eval
 ```
