@@ -126,7 +126,7 @@ async def _read_with_limit(file: UploadFile, max_bytes: int) -> bytes:
         buf.extend(chunk)
         if len(buf) > max_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=f"Arquivo excede limite de {max_bytes} bytes",
             )
     return bytes(buf)

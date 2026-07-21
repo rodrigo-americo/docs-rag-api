@@ -18,7 +18,7 @@ class IngestError(Exception):
 class DocumentTooLargeError(IngestError):
     """Arquivo excede limite de tamanho."""
 
-    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
 
     def __init__(self, size_bytes: int, max_bytes: int) -> None:
         self.size_bytes = size_bytes
@@ -29,7 +29,7 @@ class DocumentTooLargeError(IngestError):
 class DocumentTooManyPagesError(IngestError):
     """PDF excede limite de páginas."""
 
-    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
 
     def __init__(self, pages: int, max_pages: int) -> None:
         self.pages = pages
@@ -50,7 +50,7 @@ class UnsupportedFileTypeError(IngestError):
 class EmptyDocumentError(IngestError):
     """Arquivo sem conteúdo aproveitável."""
 
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def __init__(self, filename: str) -> None:
         self.filename = filename
@@ -60,7 +60,7 @@ class EmptyDocumentError(IngestError):
 class PdfParseError(IngestError):
     """PDF corrompido, vazio ou sem texto extraível."""
 
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def __init__(self, reason: str) -> None:
         self.reason = reason
