@@ -10,8 +10,13 @@ class ChatProvider(Protocol):
     ABC, structural typing.
     """
 
-    async def complete(self, prompt: str) -> str:
-        """Gera uma resposta de texto a partir de um prompt único."""
+    async def complete(self, prompt: str, *, system: str | None = None) -> str:
+        """Gera uma resposta a partir de um prompt.
+
+        `system` separa instrução (comportamento fixo, confiável) de
+        `prompt` (conteúdo variável, que pode incluir texto de documentos
+        ingeridos por terceiros — não confiável). Ver OpenAIChatProvider.
+        """
         ...
 
 
@@ -21,7 +26,7 @@ class FakeChatProvider:
     Atualmente só fatia o texto, pode ser melhorado.
     """
 
-    async def complete(self, text: str) -> str:
+    async def complete(self, text: str, *, system: str | None = None) -> str:
         return f"[fake-completion] {text[:50]}"
 
 
@@ -42,8 +47,15 @@ class OpenAIChatProvider:
 
         self._client = ChatOpenAI(api_key=api_key, model=model)
 
-    async def complete(self, text: str) -> str:
-        response = await self._client.ainvoke(text)
+    async def complete(self, text: str, *, system: str | None = None) -> str:
+        if system is None:
+            response = await self._client.ainvoke(text)
+            return response.content
+
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        messages = [SystemMessage(content=system), HumanMessage(content=text)]
+        response = await self._client.ainvoke(messages)
         return response.content
 
 
