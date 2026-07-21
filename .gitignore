@@ -11,4 +11,6 @@ tests/cassettes/
 .vscode/
 .claude/
 scope.md
+# Gerado pelo setup_dataset.py — IDs mudam a cada ingest, não versionar.
+evals/chunks_reference.json
 # NÃO ignore uv.lock — ele vai pro git, é o que garante reprodutibilidade.

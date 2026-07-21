@@ -135,20 +135,27 @@ Ganho marginal do semantic chunking não justifica a complexidade no MVP. O base
 
 ## Avaliação
 
-<!-- TODO: preencher após semana 3 -->
-
-Dataset: 20 perguntas sobre 2-3 documentos com `expected_chunk_id`.
+Dataset: 20 perguntas sobre 3 documentos sintéticos (contrato de serviço,
+política de reembolso, manual de onboarding) com `expected_chunk_id`.
 
 | Métrica | Resultado |
 |---------|-----------|
-| Recall@5 | — |
-| Faithfulness | — |
-| Latência p50 | — |
-| Latência p95 | — |
-| Custo médio / query | — |
+| Recall@5 | 100% (20/20) |
+| Faithfulness | 1.00 |
+| Latência p50 | 3.95s |
+| Latência p95 | 8.50s |
+| Custo médio / query | US$ 0.00010 |
 
-Para rodar a avaliação:
+Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=150` tokens
+(reduzido só para a avaliação — os documentos sintéticos são curtos demais
+para gerar múltiplos chunks com o `chunk_size=700` padrão). Faithfulness
+avaliada por um segundo LLM-juiz, dado o contexto recuperado e a resposta
+gerada.
+
+Para rodar a avaliação (requer `EMBEDDING_PROVIDER=openai` e
+`CHAT_PROVIDER=openai` no `.env`, com uma `OPENAI_API_KEY` real):
 
 ```bash
-python evals/run_eval.py
+uv run python -m evals.setup_dataset   # ingere os documentos uma vez
+uv run python -m evals.run_eval
 ```
