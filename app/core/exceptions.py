@@ -82,6 +82,30 @@ class EmbeddingProviderError(IngestError):
         super().__init__(f"Serviço de embeddings indisponível: {reason}")
 
 
+class SuspiciousContentError(IngestError):
+    """Documento contém um trecho que casa com um padrão de prompt injection.
+
+    422, não 500: é o documento que está sendo rejeitado por conteúdo, não
+    um bug do serviço — mesma família de EmptyDocumentError/PdfParseError.
+    A heurística é de baixo recall por design (poucos padrões, bem
+    específicos) — existe para bloquear tentativas óbvias, não para
+    detectar injection sofisticado. Falsos positivos são possíveis; por
+    isso o erro devolve o trecho exato que disparou o bloqueio, pra quem
+    escreveu o documento legítimo entender o motivo e poder contestar.
+    """
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    def __init__(self, filename: str, matched_text: str) -> None:
+        self.filename = filename
+        self.matched_text = matched_text
+        super().__init__(
+            f"Documento {filename!r} rejeitado: trecho suspeito de manipulação "
+            f"de instrução encontrado ('{matched_text}'). Se isso for um falso "
+            f"positivo, revise o texto ao redor desse trecho e tente novamente."
+        )
+
+
 class DuplicateChunkError(IngestError):
     """Violação da unique constraint (document_id, chunk_index).
 

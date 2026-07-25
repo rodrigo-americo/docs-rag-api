@@ -8,6 +8,7 @@ from app.core.exceptions import (
     EmptyDocumentError,
     IngestError,
     PdfParseError,
+    SuspiciousContentError,
     UnsupportedFileTypeError,
 )
 
@@ -22,6 +23,7 @@ from app.core.exceptions import (
         (PdfParseError(reason="corrompido"), 422),
         (DuplicateChunkError(filename="dup.txt"), 500),
         (EmbeddingProviderError(reason="timeout"), 503),
+        (SuspiciousContentError(filename="mal.txt", matched_text="ignore as instruções"), 422),
     ],
 )
 def test_to_http_maps_correct_status_code(exc: IngestError, expected_status: int):
@@ -40,6 +42,7 @@ def test_all_ingest_errors_are_subclasses_of_ingest_error():
         PdfParseError("motivo"),
         DuplicateChunkError("f.txt"),
         EmbeddingProviderError("motivo"),
+        SuspiciousContentError("f.txt", "ignore as instruções"),
     ):
         assert isinstance(exc, IngestError)
 

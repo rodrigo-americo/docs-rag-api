@@ -161,6 +161,29 @@ endpoints que geram custo direto na OpenAI — `GET /documents` e
 Se a API ganhar autenticação no futuro, o limite deveria migrar de "por IP"
 para "por API key", mais preciso e mais difícil de contornar trocando de IP.
 
+**Bloqueio de conteúdo suspeito no ingest, não só no prompt**
+Além da separação SystemMessage/HumanMessage (que mitiga no momento de
+*usar* o contexto), o ingest agora inspeciona cada chunk *antes* de gerar
+embedding e persistir — `app/services/injection_detection.py`. Se um chunk
+casar com um padrão de prompt injection conhecido (ex: "ignore as
+instruções anteriores", "you are now a...", ou uma tentativa de escapar a
+tag `<context>`), o documento inteiro é rejeitado com `422`, citando o
+trecho exato que disparou o bloqueio — para que um falso positivo legítimo
+possa ser identificado e corrigido pelo autor do documento.
+
+É uma heurística deliberadamente pequena (~12 padrões PT-BR/EN) e de baixo
+recall: pega tentativas óbvias e diretas, não prompt injection sofisticado
+ou indireto (paráfrases, ofuscação, injeção via linguagem natural sutil).
+Pesquisa recente mostra que esse é um trade-off fundamental — filtros por
+padrão têm falso-positivo baixo mas recall instável, enquanto classificadores
+semânticos (LLM julgando o próprio documento) reduzem falso-positivo à
+custa de uma segunda chamada de LLM no ingest e ainda falham bastante em
+injeção indireta. Para o volume deste projeto, a lista de padrões é a opção
+com melhor custo-benefício: sem chamada extra de LLM, sem latência adicional
+perceptível, e cobre o cenário mais realista (alguém testando um ataque óbvio
+contra a demo), não o cenário de um adversário sofisticado tentando evadir
+detecção.
+
 ---
 
 ## Segurança

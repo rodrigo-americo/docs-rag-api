@@ -14,12 +14,14 @@ from app.core.exceptions import (
     DuplicateChunkError,
     EmbeddingProviderError,
     EmptyDocumentError,
+    SuspiciousContentError,
     UnsupportedFileTypeError,
 )
 from app.core.logging import get_logger
 from app.models.document import Chunk, Document
 from app.services.chunking import chunk_text
 from app.services.embedding import EmbeddingProvider
+from app.services.injection_detection import find_suspicious_pattern
 from app.services.pdf_parser import parse_pdf
 
 
@@ -85,6 +87,20 @@ class IngestService:
         chunks_data = chunk_text(text)
         if not chunks_data:
             raise EmptyDocumentError(filename)
+
+        # 3.1. Checagem de conteúdo suspeito, chunk a chunk — antes de
+        #      gastar dinheiro com embedding. Ver app/services/injection_detection.py.
+        for chunk_data in chunks_data:
+            matched = find_suspicious_pattern(chunk_data.content)
+            if matched:
+                log.warning(
+                    "ingest.rejected",
+                    reason="suspicious_content",
+                    filename=filename,
+                    matched_text=matched,
+                )
+                raise SuspiciousContentError(filename, matched)
+
         # 4. Embedding em batch — FORA da transação. API externa nunca
         #    dentro de lock de banco.
         log.info(
