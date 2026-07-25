@@ -3,6 +3,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.sanitize import strip_html
 from app.rag.retrieval import RetrievedChunk
 
 
@@ -24,7 +25,7 @@ class Citation(BaseModel):
         return cls(
             document_id=chunk.document_id,
             chunk_id=chunk.chunk_id,
-            snippet=chunk.content,
+            snippet=strip_html(chunk.content),
             score=chunk.similarity,
         )
 

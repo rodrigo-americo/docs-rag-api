@@ -184,6 +184,20 @@ perceptível, e cobre o cenário mais realista (alguém testando um ataque óbvi
 contra a demo), não o cenário de um adversário sofisticado tentando evadir
 detecção.
 
+**`answer`/`snippet` tratados como não confiáveis, mesmo sem frontend hoje**
+`POST /query` devolve JSON puro — não há renderização HTML na API em si,
+então não existe XSS no estado atual. O risco é hipotético e futuro: se um
+frontend algum dia renderizar `answer` ou `citations[].snippet` sem escapar
+(ex: `dangerouslySetInnerHTML`), um documento malicioso que o LLM cite ou
+ecoe na resposta poderia carregar HTML/JS ativo — diferente de prompt
+injection (que manipula o *comportamento* do LLM), aqui o documento nem
+precisa instruir nada, só precisa conter markup que sobrevive à geração.
+Por isso `answer` e `snippet` passam por `strip_html()`
+(`app/core/sanitize.py`, via `bleach`) antes de sair da API, removendo
+qualquer tag — mitigação ativa hoje, não só uma nota de documentação, para
+não depender de "confiar que um futuro frontend vai escapar certo". Ver
+também a seção Segurança sobre o contrato desses campos.
+
 ---
 
 ## Segurança
@@ -191,11 +205,27 @@ detecção.
 Este é um projeto de portfólio para demonstrar a arquitetura RAG, não um
 sistema multi-tenant em produção — por isso não há login/autenticação:
 adicionar isso exigiria gerenciamento de usuários e credenciais sem servir
-ao objetivo do projeto. As proteções existentes hoje (rate limiting por IP,
-separação SystemMessage/HumanMessage contra prompt injection, limite de
-tamanho de upload) cobrem os riscos relevantes para esse escopo. Configure
-um spending limit na sua chave da OpenAI antes de rodar publicamente —
-é a rede de segurança real contra uso indevido, dado que não há autenticação.
+ao objetivo do projeto. As proteções existentes hoje cobrem os riscos
+relevantes para esse escopo:
+
+- **Rate limiting por IP** em `/query` e `/documents/ingest`.
+- **Bloqueio de conteúdo suspeito** no ingest (padrões de prompt injection).
+- **Sanitização de HTML** em `answer` e `citations[].snippet` antes de sair
+  da API.
+- **Limite de tamanho de upload** (10 MB / 50 páginas).
+
+Configure um spending limit na sua chave da OpenAI antes de rodar
+publicamente — é a rede de segurança real contra uso indevido, dado que
+não há autenticação.
+
+**Contrato dos campos de resposta:** `answer` e `citations[].snippet` são
+texto sanitizado (sem HTML), mas continuam sendo **conteúdo gerado por LLM
+e/ou derivado de documentos enviados por terceiros** — nunca confie neles
+como se fossem gerados pelo seu próprio backend. Um cliente que consumir
+esta API não deveria, por exemplo, usar `answer` para tomar decisões
+automatizadas sensíveis (ex: como entrada de outro sistema que executa
+ações) sem validação adicional — sanitização de HTML remove um vetor
+(XSS), não todos os riscos de tratar saída de LLM como dado confiável.
 
 ---
 

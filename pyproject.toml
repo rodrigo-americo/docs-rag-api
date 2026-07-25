@@ -37,6 +37,7 @@ dependencies = [
     "structlog>=24.4,<26.0",
     "numpy>=1.26,<3.0",                    # usado direto em FakeEmbeddingProvider
     "slowapi>=0.1.10",
+    "bleach>=6.4.0",
 ]
 
 [dependency-groups]
