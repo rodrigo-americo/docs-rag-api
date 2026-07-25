@@ -32,6 +32,12 @@ class Citation(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str = Field(..., description="Resposta gerada com base nos documentos indexados")
+    answerable: bool | None = Field(
+        None,
+        description="False se o sistema recusou responder por falta de informação "
+        "nos documentos — sinal estruturado, não depende de interpretar o texto de "
+        "answer para saber se foi uma recusa.",
+    )
     citations: list[Citation] = Field(..., description="Chunks usados como fonte da resposta")
     trace_id: str | None = Field(
         None, description="ID do trace no LangSmith — ainda não implementado"

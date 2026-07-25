@@ -9,6 +9,7 @@ async def test_query_returns_answer_and_citations(client, sample_txt_bytes):
     assert response.status_code == 200
     body = response.json()
     assert body["answer"]
+    assert body["answerable"] is not None
     assert len(body["citations"]) > 0
     citation = body["citations"][0]
     assert {"document_id", "chunk_id", "snippet", "score"} <= citation.keys()
@@ -41,6 +42,7 @@ async def test_query_without_any_documents_returns_no_citations(client, capsys):
     # structlog escreve direto em stdout (não passa pelo stdlib logging),
     # então capsys em vez de caplog.
     assert "security.rewrite_limit_reached" in capsys.readouterr().out
+    assert body["answerable"] is not None
 
 
 async def test_query_missing_question_returns_422(client):

@@ -1,6 +1,10 @@
-from typing import Protocol
+from typing import Protocol, TypeVar
+
+from pydantic import BaseModel
 
 from app.core.config import settings
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class ChatProvider(Protocol):
@@ -19,6 +23,15 @@ class ChatProvider(Protocol):
         """
         ...
 
+    async def complete_structured(self, prompt: str, *, system: str, schema: type[T]) -> T:
+        """Gera uma resposta validada contra `schema` (Pydantic).
+
+        Usa function calling nativo do provider (não parsing de texto/JSON
+        manual) — garante o formato pelo mecanismo da própria API, não por
+        "confiar" que o LLM escreveu JSON válido em texto livre.
+        """
+        ...
+
 
 class FakeChatProvider:
     """Provider para teste sem gasto real de token.
@@ -28,6 +41,19 @@ class FakeChatProvider:
 
     async def complete(self, text: str, *, system: str | None = None) -> str:
         return f"[fake-completion] {text[:50]}"
+
+    async def complete_structured(self, prompt: str, *, system: str, schema: type[T]) -> T:
+        # Preenche cada campo com um valor fake plausível pelo tipo declarado
+        # — evita hardcodar conhecimento de schemas específicos aqui.
+        values = {}
+        for field_name, field in schema.model_fields.items():
+            if field.annotation is bool:
+                values[field_name] = True
+            elif field.annotation is str:
+                values[field_name] = f"[fake-completion] {prompt[:50]}"
+            else:
+                values[field_name] = field.get_default(call_default_factory=True)
+        return schema(**values)
 
 
 class OpenAIChatProvider:
@@ -57,6 +83,13 @@ class OpenAIChatProvider:
         messages = [SystemMessage(content=system), HumanMessage(content=text)]
         response = await self._client.ainvoke(messages)
         return response.content
+
+    async def complete_structured(self, prompt: str, *, system: str, schema: type[T]) -> T:
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
+        structured_client = self._client.with_structured_output(schema)
+        return await structured_client.ainvoke(messages)
 
 
 def get_chat_provider() -> ChatProvider:

@@ -207,10 +207,34 @@ legítimo. `POST /query` loga `security.rewrite_limit_reached` (com IP,
 `max_rewrite_attempts`, mesmo a resposta final saindo normalmente com
 `200`. Isso não bloqueia nem limita nada sozinho — é dado pra permitir,
 depois, agregar por IP (ex: contar quantas vezes isso aparece num
-intervalo) sem precisar instrumentar o código de novo. Um log equivalente
-para recusas repetidas ("não sei") fica para quando a resposta expuser um
-campo estruturado indicando recusa, em vez de depender de casar frases em
-linguagem natural — heurística frágil demais pra basear alerta.
+intervalo) sem precisar instrumentar o código de novo.
+
+**`answerable: bool` estruturado em vez de detectar recusa por regex**
+`generate_answer` usava só texto livre — saber se a resposta era uma
+recusa ("não sei") dependia de casar substrings como "não encontrei",
+"não consta" etc. Qualquer variação de fraseologia do LLM escapava dessa
+lista silenciosamente. Trocado por saída estruturada via
+`with_structured_output` do LangChain (`GeneratedAnswer`, em
+`app/rag/graph.py`): o LLM retorna `{answerable: bool, answer: str}`
+usando function calling nativo da API, não texto formatado como JSON —
+o formato é garantido pelo mecanismo da própria OpenAI, não por
+"confiar" que o LLM escreveu certo. `answerable` é propagado pelo
+`RagState`, exposto em `QueryResponse.answerable`, e usado tanto por
+`evals/run_eval.py` (substituindo `REFUSAL_MARKERS`) quanto pelo log de
+segurança abaixo. Efeito colateral observado: a métrica de Faithfulness
+subiu de 0.95 para 1.00 numa rodada após a troca — não porque o sistema
+ficou "mais fiel", mas porque a classificação de "isso é uma recusa" (que
+decide o que entra na amostra julgada por Faithfulness) ficou mais
+precisa.
+
+**Log estruturado quando o sistema recusa responder**
+Mesmo raciocínio do log de rewrite: uma recusa isolada é normal (a
+pergunta pode realmente estar fora dos documentos), mas o mesmo IP
+recusando repetidamente é um padrão a observar — pode indicar tentativa
+de sondar o que existe ou não nos documentos. `POST /query` loga
+`security.answer_refused` (IP + pergunta) sempre que `answerable` volta
+`False`, usando o campo estruturado direto — nenhuma heurística de texto
+envolvida.
 
 ---
 
@@ -258,9 +282,9 @@ não sabe em vez de inventar uma resposta.
 | Recall@5 (perguntas respondíveis) | 100% (22/22) |
 | Rewrite disparado | 17/26 perguntas |
 | Recusa correta (fora de escopo) | 100% (4/4) |
-| Faithfulness | 0.95 (21 respostas não-recusa) |
-| Latência p50 | 3.87s |
-| Latência p95 | 6.87s |
+| Faithfulness | 1.00 (21 respostas não-recusa) |
+| Latência p50 | 3.60s |
+| Latência p95 | 4.22s |
 | Custo médio / query | US$ 0.00010 |
 
 Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=150` tokens
@@ -270,10 +294,13 @@ avaliada por um segundo LLM-juiz, dado o contexto recuperado e a resposta
 gerada, e calculada apenas sobre respostas que tentaram afirmar algo com
 base no contexto — uma recusa correta ("não sei") não é falta de fidelidade,
 é o comportamento esperado, e incluí-la penalizaria a métrica injustamente.
-O valor oscila cerca de ±0.02 entre execuções: o juiz é o próprio
-`gpt-4o-mini`, e LLM-as-judge não é determinístico — a mesma resposta
-correta ocasionalmente recebe 0.5 em vez de 1.0 numa pergunta de fronteira.
-Isso é ruído de medição, não um bug do sistema avaliado.
+"Recusa correta" e a exclusão de recusas do cálculo de Faithfulness usam
+o campo estruturado `answerable` (ver "Decisões técnicas"), não mais regex
+sobre frases de recusa — a classificação ficou mais precisa, o que explica
+a Faithfulness ter subido de 0.95 para 1.00 nesta rodada em relação a
+versões anteriores. O valor ainda pode oscilar entre execuções: o juiz é
+o próprio `gpt-4o-mini`, e LLM-as-judge não é determinístico — isso
+continua sendo ruído de medição, não um bug do sistema avaliado.
 
 O prompt de geração também instrui o modelo a não combinar números de
 trechos diferentes (ex: taxa de multa de um chunk + valor total de outro) —

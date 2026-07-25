@@ -48,6 +48,7 @@ class QueryTrace:
     out_of_scope: bool
     retrieved_chunk_ids: list[str]
     answer: str
+    answerable: bool | None
     context: str
     retry_count: int
     latency_seconds: float
@@ -97,6 +98,7 @@ async def _run_single_query(
             "retrieved_chunks": [],
             "retry_count": 0,
             "answer": None,
+            "answerable": None,
             "citations": [],
         }
 
@@ -113,6 +115,7 @@ async def _run_single_query(
         out_of_scope=out_of_scope,
         retrieved_chunk_ids=[str(c.chunk_id) for c in final_state["citations"]],
         answer=answer,
+        answerable=final_state["answerable"],
         context=context,
         retry_count=final_state["retry_count"],
         latency_seconds=latency,
@@ -140,14 +143,11 @@ def _recall_at_k(trace: QueryTrace) -> bool:
     return trace.expected_chunk_id in trace.retrieved_chunk_ids
 
 
-REFUSAL_MARKERS = ("não sei", "não encontrei", "não há informação", "não consta", "não possuo")
-
-
 def _correctly_refused(trace: QueryTrace) -> bool:
-    """Só faz sentido pra perguntas out_of_scope: o grafo deveria reconhecer
-    que a informação não está nos documentos em vez de inventar uma resposta."""
-    answer_lower = trace.answer.lower()
-    return any(marker in answer_lower for marker in REFUSAL_MARKERS)
+    """Lê o campo estruturado `answerable` (app/rag/graph.py:GeneratedAnswer)
+    em vez de casar frases de recusa em texto livre — não depende da
+    fraseologia exata que o LLM usou pra dizer "não sei"."""
+    return trace.answerable is False
 
 
 async def main() -> None:

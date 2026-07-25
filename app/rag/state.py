@@ -10,4 +10,5 @@ class RagState(TypedDict):
     retrieved_chunks: list[RetrievedChunk]
     retry_count: int
     answer: str | None
+    answerable: bool | None
     citations: list[RetrievedChunk]

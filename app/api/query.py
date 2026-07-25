@@ -48,6 +48,7 @@ async def query(
         "retrieved_chunks": [],
         "retry_count": 0,
         "answer": None,
+        "answerable": None,
         "citations": [],
     }
     compiled_graph = build_graph(
@@ -71,7 +72,19 @@ async def query(
             question=body.question,
         )
 
+    if final_state["answerable"] is False:
+        # Mesmo raciocínio do log acima: uma recusa isolada é normal, o
+        # mesmo IP recusando repetidamente pode indicar tentativa de
+        # sondar informação fora do escopo dos documentos. Usa o campo
+        # estruturado direto — nada de casar frase de recusa em texto livre.
+        log.warning(
+            "security.answer_refused",
+            client_ip=get_remote_address(request),
+            question=body.question,
+        )
+
     return QueryResponse(
         answer=strip_html(final_state["answer"]),
+        answerable=final_state["answerable"],
         citations=[Citation.from_chunk(chunk) for chunk in final_state["citations"]],
     )
