@@ -198,6 +198,20 @@ qualquer tag — mitigação ativa hoje, não só uma nota de documentação, pa
 não depender de "confiar que um futuro frontend vai escapar certo". Ver
 também a seção Segurança sobre o contrato desses campos.
 
+**Log estruturado quando o rewrite bate o limite, não só quando falha**
+Uma pergunta difícil disparar `rewrite_query` uma ou duas vezes é normal.
+O mesmo IP disparando isso repetidamente é um padrão diferente — mais
+consistente com alguém sondando os limites do retrieval do que com uso
+legítimo. `POST /query` loga `security.rewrite_limit_reached` (com IP,
+`retry_count` e a pergunta) sempre que `retry_count` atinge
+`max_rewrite_attempts`, mesmo a resposta final saindo normalmente com
+`200`. Isso não bloqueia nem limita nada sozinho — é dado pra permitir,
+depois, agregar por IP (ex: contar quantas vezes isso aparece num
+intervalo) sem precisar instrumentar o código de novo. Um log equivalente
+para recusas repetidas ("não sei") fica para quando a resposta expuser um
+campo estruturado indicando recusa, em vez de depender de casar frases em
+linguagem natural — heurística frágil demais pra basear alerta.
+
 ---
 
 ## Segurança

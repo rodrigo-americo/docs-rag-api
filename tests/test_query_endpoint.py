@@ -29,12 +29,18 @@ async def test_query_respects_top_k_override(client, sample_txt_bytes):
     assert len(response.json()["citations"]) <= 1
 
 
-async def test_query_without_any_documents_returns_no_citations(client):
+async def test_query_without_any_documents_returns_no_citations(client, capsys):
     response = await client.post("/query", json={"question": "Qualquer pergunta"})
 
     assert response.status_code == 200
     body = response.json()
     assert body["citations"] == []
+
+    # Sem documentos, retrieved_chunks fica vazio em toda tentativa —
+    # o grafo bate max_rewrite_attempts, o que deve gerar o log de segurança.
+    # structlog escreve direto em stdout (não passa pelo stdlib logging),
+    # então capsys em vez de caplog.
+    assert "security.rewrite_limit_reached" in capsys.readouterr().out
 
 
 async def test_query_missing_question_returns_422(client):
