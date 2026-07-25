@@ -50,7 +50,16 @@ class Settings(BaseSettings):
     chunk_overlap: int = 100
 
     retrieval_top_k: int = 5
-    retrieval_quality_threshold: float = 0.7
+    # Calibrado via sweep sobre o dataset de avaliação (34 perguntas, ver
+    # README "Calibração do retrieval_quality_threshold"): 0.6 corta o
+    # número de rewrites quase pela metade em relação a 0.7 (25->11 de 34)
+    # sem perder Recall@5 nem recusa correta (ambos seguem 100%) — reduz
+    # latência mediana de ~3.5s pra ~1.7s. Não existe corte que separe
+    # perfeitamente perguntas respondíveis de fora-de-escopo por
+    # similaridade pura; quem decide a recusa final é o LLM (`answerable`),
+    # não este threshold — ele só controla quantas vezes tentar de novo
+    # antes de desistir.
+    retrieval_quality_threshold: float = 0.6
     # Se a 1ª reformulação não melhorou o retrieval o suficiente, é mais
     # provável que a informação não esteja nos documentos do que uma 2ª
     # reformulação achar algo que a 1ª não achou — melhor responder "não
