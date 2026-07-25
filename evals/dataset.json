@@ -1,91 +1,91 @@
 [
   {
     "question": "Qual o objeto do contrato de prestação de serviços da TechConsult?",
-    "expected_chunk_id": "c10e9732-2ba3-4079-aa3f-a49820708dd6"
+    "expected_chunk_id": "6bd197ca-16e5-4ece-bf55-0aa3a61031ab"
   },
   {
     "question": "Qual o prazo de entrega acordado no contrato de serviço?",
-    "expected_chunk_id": "6602d0bc-f737-4678-94e7-d48436e05bf5"
+    "expected_chunk_id": "69e82fe1-8352-4a0a-8631-212f22b762ad"
   },
   {
     "question": "Qual a multa por atraso não comunicado na entrega do contrato de serviço?",
-    "expected_chunk_id": "6602d0bc-f737-4678-94e7-d48436e05bf5"
+    "expected_chunk_id": "69e82fe1-8352-4a0a-8631-212f22b762ad"
   },
   {
     "question": "Qual o valor total do contrato de prestação de serviços e como ele é parcelado?",
-    "expected_chunk_id": "4d7b44ba-cfd4-4863-be14-60c4faf5c02b"
+    "expected_chunk_id": "4c7600af-5e81-4fdc-9ad1-6c30c8091d4a"
   },
   {
     "question": "Quantos dias de garantia a TechConsult oferece após a entrega final do software?",
-    "expected_chunk_id": "ec50a3a2-1add-41f1-a289-6b968a0940c2"
+    "expected_chunk_id": "fbf83c02-26ed-4365-af00-97bb7b13559f"
   },
   {
     "question": "Por quanto tempo dura a obrigação de confidencialidade após o fim do contrato de serviço?",
-    "expected_chunk_id": "4c13388e-8feb-4e36-ad39-7723d51977a9"
+    "expected_chunk_id": "b514a381-162d-45a1-bfdc-8870ec485d8a"
   },
   {
     "question": "Qual a multa em caso de rescisão antecipada do contrato pela CONTRATANTE sem justa causa?",
-    "expected_chunk_id": "4c13388e-8feb-4e36-ad39-7723d51977a9"
+    "expected_chunk_id": "b514a381-162d-45a1-bfdc-8870ec485d8a"
   },
   {
     "question": "Qual o foro eleito para resolver disputas do contrato de prestação de serviços?",
-    "expected_chunk_id": "a95f3d16-aef5-444e-a077-6e8f61d27e02"
+    "expected_chunk_id": "1ff1c298-4fe2-4f3a-ab1f-81be4307f7fe"
   },
   {
     "question": "Quais documentos um novo colaborador precisa levar no primeiro dia de trabalho?",
-    "expected_chunk_id": "9ea867e0-0ca3-43a0-87d2-8d62d2846641"
+    "expected_chunk_id": "045f0f88-3ea6-4399-a861-fd5825cf34c4"
   },
   {
     "question": "Quanto tempo dura o período de experiência de um colaborador CLT na Vetor Analytics?",
-    "expected_chunk_id": "73b17295-e6b7-4bfb-b258-dd1c437fb455"
+    "expected_chunk_id": "d1156e31-6fbd-479c-92b2-c1167c3c0f80"
   },
   {
     "question": "Qual o valor do vale-refeição oferecido pela Vetor Analytics?",
-    "expected_chunk_id": "d2a08e32-aa40-4da6-b920-219c4e408444"
+    "expected_chunk_id": "3630632e-89fd-44d6-b84c-f81654b4cc28"
   },
   {
     "question": "Quantos dias por semana o colaborador precisa ir ao escritório no modelo híbrido da Vetor Analytics?",
-    "expected_chunk_id": "eef746b3-b908-4cac-8688-e127fcc542af"
+    "expected_chunk_id": "1f97cf85-ff8c-44c1-a4c5-53aed4b978b7"
   },
   {
     "question": "Qual o prazo máximo para concluir os treinamentos obrigatórios de segurança da informação?",
-    "expected_chunk_id": "0b5b0893-8794-4c8e-8c11-62c1276fcec0"
+    "expected_chunk_id": "d681ebb8-84c0-4aa0-b4c9-5d2a44d9d4be"
   },
   {
     "question": "Com quantos dias de antecedência as férias devem ser solicitadas na Vetor Analytics?",
-    "expected_chunk_id": "de6d0825-2f80-459b-91be-1e157918e667"
+    "expected_chunk_id": "d65fac85-edc6-4bfe-b8c7-5bfaceb68154"
   },
   {
     "question": "Qual o e-mail de contato do RH da Vetor Analytics para dúvidas sobre benefícios?",
-    "expected_chunk_id": "f25d47c6-75f2-4718-9cba-e8b4f391daf9"
+    "expected_chunk_id": "8d0ddce2-bdaa-4796-a37f-f439eeb25efd"
   },
   {
     "question": "Quantos dias o cliente tem para solicitar reembolso após receber o produto na NordTech?",
-    "expected_chunk_id": "3219944a-8026-421e-a167-315ae5d25c54"
+    "expected_chunk_id": "c8a92a95-743c-43cb-a512-25452562c715"
   },
   {
     "question": "Produtos com lacre de segurança rompido podem ser devolvidos por arrependimento?",
-    "expected_chunk_id": "3fed2350-49d7-4fe0-ac97-9d50063e13fa"
+    "expected_chunk_id": "ec9dfc47-2296-4636-8327-b7e2facd04f2"
   },
   {
     "question": "Em quanto tempo o reembolso é processado após a NordTech confirmar o recebimento do produto devolvido?",
-    "expected_chunk_id": "43cbcc6d-c622-493d-aa97-8cb74a292f99"
+    "expected_chunk_id": "ea58ee73-c81a-4256-b653-ca0e0ef3130a"
   },
   {
     "question": "Qual o prazo de garantia legal para produtos duráveis com defeito de fabricação na NordTech?",
-    "expected_chunk_id": "735378e9-9b71-4b03-b0cb-e2b696a27329"
+    "expected_chunk_id": "96c4a1db-2f6e-4887-ac08-ee55a10f6ef9"
   },
   {
     "question": "Quem paga o frete de devolução em caso de defeito de fabricação na NordTech?",
-    "expected_chunk_id": "f984d527-794f-4245-9cf4-1510a3f7cbec"
+    "expected_chunk_id": "d2167c7d-10bb-4ca4-83dd-22ca1ad49f98"
   },
   {
     "question": "Quanto tempo demora pra ficar pronto o serviço combinado com a TechConsult?",
-    "expected_chunk_id": "6602d0bc-f737-4678-94e7-d48436e05bf5"
+    "expected_chunk_id": "69e82fe1-8352-4a0a-8631-212f22b762ad"
   },
   {
     "question": "Quanto custa pra CONTRATANTE desistir do contrato antes do fim sem motivo?",
-    "expected_chunk_id": "4c13388e-8feb-4e36-ad39-7723d51977a9"
+    "expected_chunk_id": "b514a381-162d-45a1-bfdc-8870ec485d8a"
   },
   {
     "question": "A Vetor Analytics paga 13º salário aos colaboradores?",
@@ -104,6 +104,46 @@
   },
   {
     "question": "A NordTech oferece desconto para pagamento à vista?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "Qual o valor da multa por atraso na entrega da segunda parcela de pagamento?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "O contrato prevê reajuste anual de valores por inflação?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "Quantas revisões gratuitas de escopo o cliente tem direito antes da entrega final?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "Qual o valor do auxílio-creche oferecido pela Vetor Analytics?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "A Vetor Analytics oferece day off de aniversário aos colaboradores?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "Depois de quantos ciclos de avaliação de desempenho o colaborador pode pedir promoção?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "A NordTech aceita troca de produto por outro modelo, sem ser por defeito?",
+    "expected_chunk_id": null,
+    "out_of_scope": true
+  },
+  {
+    "question": "Qual o prazo de garantia para produtos não duráveis na NordTech?",
     "expected_chunk_id": null,
     "out_of_scope": true
   }

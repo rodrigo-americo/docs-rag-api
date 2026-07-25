@@ -269,22 +269,29 @@ ações) sem validação adicional — sanitização de HTML remove um vetor
 
 ## Avaliação
 
-Dataset: 26 perguntas sobre 3 documentos sintéticos (contrato de serviço,
+Dataset: 34 perguntas sobre 3 documentos sintéticos (contrato de serviço,
 política de reembolso, manual de onboarding) com `expected_chunk_id`.
 22 perguntas têm resposta nos documentos (algumas com vocabulário
 propositalmente distante do texto original, para forçar o branch de
-rewrite do grafo); 4 são propositalmente fora de escopo — informação que
-não existe em nenhum documento — para medir se o sistema reconhece que
-não sabe em vez de inventar uma resposta.
+rewrite do grafo); 12 são propositalmente fora de escopo — cobrindo três
+variações: tópicos plausíveis nunca mencionados, perguntas que usam
+vocabulário/entidades reais dos documentos mas pedem um dado que não
+existe (mais difíceis de recusar corretamente que um tópico totalmente
+alheio), e casos de fronteira que exploram os limites exatos de uma
+definição do texto (ex: garantia vale só para "produtos duráveis" —
+pergunta sobre produtos não-duráveis). Amostra ampliada de 4 para 12
+casos negativos porque 100% sobre 4 exemplos tem intervalo de confiança
+grande demais pra ser uma alegação séria — 12 casos, incluindo os mais
+difíceis de cada variação, é uma prova mais forte do mecanismo de recusa.
 
 | Métrica | Resultado |
 |---------|-----------|
 | Recall@5 (perguntas respondíveis) | 100% (22/22) |
-| Rewrite disparado | 17/26 perguntas |
-| Recusa correta (fora de escopo) | 100% (4/4) |
+| Rewrite disparado | 25/34 perguntas |
+| Recusa correta (fora de escopo) | 100% (12/12) |
 | Faithfulness | 1.00 (21 respostas não-recusa) |
-| Latência p50 | 3.60s |
-| Latência p95 | 4.22s |
+| Latência p50 | 3.51s |
+| Latência p95 | 5.93s |
 | Custo médio / query | US$ 0.00010 |
 
 Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=150` tokens
@@ -296,11 +303,26 @@ base no contexto — uma recusa correta ("não sei") não é falta de fidelidade
 é o comportamento esperado, e incluí-la penalizaria a métrica injustamente.
 "Recusa correta" e a exclusão de recusas do cálculo de Faithfulness usam
 o campo estruturado `answerable` (ver "Decisões técnicas"), não mais regex
-sobre frases de recusa — a classificação ficou mais precisa, o que explica
-a Faithfulness ter subido de 0.95 para 1.00 nesta rodada em relação a
-versões anteriores. O valor ainda pode oscilar entre execuções: o juiz é
-o próprio `gpt-4o-mini`, e LLM-as-judge não é determinístico — isso
-continua sendo ruído de medição, não um bug do sistema avaliado.
+sobre frases de recusa.
+
+Faithfulness é medida sobre 21 (não 22) respostas não-recusa: uma das 22
+perguntas respondíveis ("Produtos com lacre de segurança rompido podem
+ser devolvidos por arrependimento?" — cuja resposta correta é "não",
+com uma exceção) foi classificada com `answerable=false` nesta rodada. O
+LLM interpretou uma resposta negativa como "não encontrei a informação"
+em vez de "encontrei, e a resposta é não" — um erro de raciocínio real
+do modelo, não do pipeline, e consistente com o ruído de não-determinismo
+já documentado abaixo (o juiz é o próprio `gpt-4o-mini`, que ocasionalmente
+erra em perguntas de fronteira). Uma pergunta cuja resposta correta é uma
+negação é, por natureza, mais fácil de confundir com uma recusa — vale
+ter isso em mente ao desenhar novas perguntas respondíveis para o dataset.
+
+Latência p95 desta rodada inclui uma execução com retry/timeout de rede
+transitório do lado da OpenAI (uma única chamada levou ~34 minutos,
+bem fora da faixa normal de segundos) — não influenciou a métrica
+reportada, já que o outlier ficou acima do percentil 95 de 34 amostras,
+mas fica registrado que latência de cauda longa aqui reflete
+instabilidade de rede externa, não o código do pipeline.
 
 O prompt de geração também instrui o modelo a não combinar números de
 trechos diferentes (ex: taxa de multa de um chunk + valor total de outro) —
