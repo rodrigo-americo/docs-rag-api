@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "console"
 
+    # --- Rate limiting ---
+    # Sem autenticação (projeto de portfólio, não multi-tenant — ver README),
+    # o limite é por IP. Cobre os dois endpoints que custam dinheiro (OpenAI).
+    # Desligável em teste (rate_limit_enabled=False) porque o client de teste
+    # usa ASGITransport, onde todas as requisições compartilham o mesmo IP.
+    rate_limit_enabled: bool = True
+    rate_limit_query: str = "20/minute"
+    rate_limit_ingest: str = "10/minute"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url_sync(self) -> str:

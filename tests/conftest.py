@@ -29,6 +29,11 @@ async def _override_get_db_session():
 
 app.dependency_overrides[get_db_session] = _override_get_db_session
 
+# ASGITransport faz todas as requisições de teste compartilharem o mesmo IP
+# (get_remote_address), então o rate limit por IP derrubaria a suite se
+# ficasse ligado aqui — desliga só no processo de teste.
+app.state.limiter.enabled = False
+
 
 @pytest_asyncio.fixture(autouse=True)
 async def _clean_tables():

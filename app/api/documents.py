@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.db import get_db_session
 from app.core.exceptions import DocumentTooLargeError, IngestError
 from app.core.logging import get_logger
+from app.core.rate_limit import limiter
 from app.models.document import Document
 from app.schemas.documents import DocumentSummary, IngestResponse
 from app.services.embedding import EmbeddingProvider, get_embedding_provider
@@ -71,7 +72,9 @@ async def delete_document(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Ingere um arquivo PDF, MD ou TXT",
 )
+@limiter.limit(settings.rate_limit_ingest)
 async def ingest_document(
+    request: Request,
     file: UploadFile = File(...),
     title: str | None = Form(None),
     session: AsyncSession = Depends(get_db_session),

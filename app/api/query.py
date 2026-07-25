@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_db_session
+from app.core.rate_limit import limiter
 from app.rag.graph import build_graph
 from app.rag.state import RagState
 from app.schemas.query import Citation, QueryRequest, QueryResponse
@@ -26,15 +28,17 @@ def get_embedding() -> EmbeddingProvider:
     response_model=QueryResponse,
     summary="Responde uma pergunta com base nos documentos indexados",
 )
+@limiter.limit(settings.rate_limit_query)
 async def query(
-    request: QueryRequest,
+    request: Request,
+    body: QueryRequest,
     session: AsyncSession = Depends(get_db_session),
     embedding_provider: EmbeddingProvider = Depends(get_embedding),
     chat_provider: ChatProvider = Depends(get_chat),
 ) -> QueryResponse:
     initial_state: RagState = {
-        "question": request.question,
-        "top_k": request.top_k,
+        "question": body.question,
+        "top_k": body.top_k,
         "rewritten_question": None,
         "retrieved_chunks": [],
         "retry_count": 0,
