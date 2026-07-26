@@ -318,6 +318,42 @@ Vale ter isso em mente ao desenhar novas perguntas respondíveis para o
 dataset — e é um caso interessante para investigar se vale reforçar o
 prompt de geração no futuro (fora do escopo desta avaliação).
 
+### Viés do juiz de Faithfulness
+
+O juiz de Faithfulness é o mesmo modelo que gera as respostas
+(`gpt-4o-mini`), o que é uma limitação metodológica conhecida de
+LLM-as-judge: um modelo tende a dar nota mais generosa à sua própria
+"forma de escrever" do que um avaliador independente daria
+(self-preference bias). Testado de duas formas, com um segundo juiz
+diferente do gerador (`gpt-4.1-mini`):
+
+**Contra o dataset real de avaliação**: as 21 respostas não-recusa desta
+rodada resultaram em nota 1.00 idêntica para os dois juízes — diferença
+zero. Isso não significa que o viés não existe; significa que, com
+`retrieval_quality_threshold=0.6`, o pipeline acerta a maioria das
+respostas com folga suficiente para não deixar margem de discordância
+entre juízes — a amostra não teve "zona cinzenta".
+
+**Contra 5 casos fabricados deliberadamente ambíguos** (respostas com
+extrapolação, generalização além do texto ou inferência não dita
+explicitamente pelo contexto, construídos à parte do dataset oficial
+só para este teste): os juízes discordaram em 2 dos 5 casos, com
+diferença média de 0.20 na amostra — `gpt-4.1-mini` (juiz diferente)
+julgou consistentemente mais rigoroso que `gpt-4o-mini` (mesmo modelo
+do gerador) nos casos de extrapolação. Isso é evidência concreta de que
+o viés existe e é mensurável, mesmo não tendo aparecido nas 21
+respostas reais desta rodada.
+
+Conclusão: o número de Faithfulness reportado acima (0.98) provavelmente
+não está inflado *nesta rodada específica*, porque as respostas
+avaliadas eram, em sua maioria, diretas o bastante para não dar margem
+de discordância — mas o mecanismo de viés está presente e se manifestaria
+caso o gerador cometesse mais extrapolações sutis. Não trocamos o juiz de
+produção por isso (adicionaria custo/latência a cada avaliação para um
+ganho que só se manifesta em casos de fronteira raros neste dataset),
+mas fica documentado como limitação conhecida, com evidência empírica
+em vez de suposição.
+
 ### Calibração do `retrieval_quality_threshold`
 
 `app/core/config.py` define `retrieval_quality_threshold=0.6` — o corte de
