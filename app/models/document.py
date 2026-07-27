@@ -1,7 +1,9 @@
+import enum
 import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,6 +19,13 @@ from app.core.db import Base
 EMBEDDING_DIM = 1536
 
 
+class DocumentStatus(enum.StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    INDEXED = "indexed"
+    FAILED = "failed"
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -27,6 +36,12 @@ class Document(Base):
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     source_filename: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[DocumentStatus] = mapped_column(
+        SQLAlchemyEnum(DocumentStatus, native_enum=False),
+        nullable=False,
+        default=DocumentStatus.PENDING,
+    )
+    content_sha256: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         server_default=func.now(),

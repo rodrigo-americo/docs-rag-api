@@ -1,11 +1,22 @@
 import uuid
+from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.db import get_db_session
+from app.core.db import AsyncSessionLocal, get_db_session
 from app.core.exceptions import DocumentTooLargeError, IngestError
 from app.core.logging import get_logger
 from app.core.rate_limit import limiter
@@ -22,6 +33,15 @@ log = get_logger(__name__)
 def get_embedding() -> EmbeddingProvider:
     """Dependency pra injetar o embedding provider — facilita override em testes."""
     return get_embedding_provider()
+
+
+def get_session_factory() -> Callable[[], AsyncSession]:
+    """Dependency pra injetar a factory de sessão usada em background tasks
+    (process_document abre sua própria sessão, fora do ciclo do request).
+    Sobrescrita em teste pra apontar pro engine de teste, evitando que a
+    background task use o pool de conexões de produção preso a um event
+    loop de teste diferente do atual."""
+    return AsyncSessionLocal
 
 
 @router.get(
@@ -41,10 +61,36 @@ async def list_documents(
             id=doc.id,
             title=doc.title,
             source_filename=doc.source_filename,
+            status=doc.status,
             created_at=doc.created_at,
         )
         for doc in documents
     ]
+
+
+@router.get(
+    "/{document_id}",
+    response_model=DocumentSummary,
+    summary="Consulta um documento e seu status de processamento",
+)
+async def get_document(
+    document_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> DocumentSummary:
+    document = await session.get(Document, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento {document_id} não encontrado",
+        )
+
+    return DocumentSummary(
+        id=document.id,
+        title=document.title,
+        source_filename=document.source_filename,
+        status=document.status,
+        created_at=document.created_at,
+    )
 
 
 @router.delete(
@@ -75,17 +121,21 @@ async def delete_document(
 @limiter.limit(settings.rate_limit_ingest)
 async def ingest_document(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: str | None = Form(None),
     session: AsyncSession = Depends(get_db_session),
     embedding: EmbeddingProvider = Depends(get_embedding),
+    session_factory: Callable[[], AsyncSession] = Depends(get_session_factory),
 ) -> IngestResponse:
     # 1. Lê conteúdo com limite estrito — protege contra DoS de upload grande.
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
     content = await _read_with_limit(file, max_bytes)
 
     # 2. Delega tudo pra service. Endpoint só traduz exceções de domínio em HTTP.
-    service = IngestService(session=session, embedding_provider=embedding)
+    service = IngestService(
+        session=session, embedding_provider=embedding, session_factory=session_factory
+    )
     try:
         result = await service.ingest(
             content=content,
@@ -106,10 +156,22 @@ async def ingest_document(
         # não exigem tocar neste endpoint.
         raise exc.to_http() from exc
 
+    # 3. Só enfileira o processamento pesado se for um documento novo — uma
+    #    duplicata já foi (ou está sendo) processada, reenfileirar geraria
+    #    chamada de embedding desperdiçada e cairia na unique constraint.
+    if not result.is_duplicate:
+        background_tasks.add_task(
+            service.process_document,
+            document_id=result.document_id,
+            content=content,
+            filename=file.filename or "unknown",
+        )
+
     return IngestResponse(
         document_id=result.document_id,
         title=result.title,
         chunks_created=result.chunks_created,
+        status=result.status,
     )
 
 

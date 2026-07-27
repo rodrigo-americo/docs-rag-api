@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.documents import get_session_factory
 from app.core.config import settings
 from app.core.db import get_db_session
 from app.main import app
@@ -28,6 +29,11 @@ async def _override_get_db_session():
 
 
 app.dependency_overrides[get_db_session] = _override_get_db_session
+
+# process_document (background task) precisa da mesma proteção contra
+# "Event loop is closed" que _override_get_db_session já dá ao fluxo normal
+# de request — usa o engine de teste (NullPool), não o de produção.
+app.dependency_overrides[get_session_factory] = lambda: _TestSessionLocal
 
 # ASGITransport faz todas as requisições de teste compartilharem o mesmo IP
 # (get_remote_address), então o rate limit por IP derrubaria a suite se

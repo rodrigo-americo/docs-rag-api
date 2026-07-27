@@ -34,14 +34,36 @@ curl -X POST http://localhost:8000/documents/ingest \
   -F "title=Contrato de Serviço"
 ```
 
+A resposta chega imediatamente, antes do processamento pesado terminar —
+`chunks_created` é sempre `0` neste momento, e `status` é `pending`:
+
 ```json
 {
   "document_id": "3f1a...",
   "title": "Contrato de Serviço",
-  "chunks_created": 42,
-  "status": "indexed"
+  "chunks_created": 0,
+  "status": "pending"
 }
 ```
+
+**Consultar se o processamento terminou:**
+```bash
+curl http://localhost:8000/documents/3f1a...
+```
+
+```json
+{
+  "id": "3f1a...",
+  "title": "Contrato de Serviço",
+  "source_filename": "contrato.pdf",
+  "status": "indexed",
+  "created_at": "2026-07-27T03:00:00Z"
+}
+```
+
+`status` evolui `pending` → `indexed` (sucesso) ou `pending` → `failed`
+(erro de parse, tipo de arquivo não suportado, conteúdo suspeito ou falha
+da OpenAI durante o embedding — ver "Ingest assíncrono" abaixo).
 
 **Fazer uma pergunta:**
 ```bash
@@ -71,7 +93,8 @@ curl -X POST http://localhost:8000/query \
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `POST` | `/documents/ingest` | Ingere PDF ou Markdown (máx. 10 MB / 50 páginas) |
+| `POST` | `/documents/ingest` | Ingere PDF ou Markdown (máx. 10 MB / 50 páginas). Responde imediatamente com `status=pending`; processamento pesado roda em background |
+| `GET` | `/documents/{id}` | Consulta um documento e seu status de processamento (`pending`/`indexed`/`failed`) |
 | `POST` | `/query` | Pergunta em linguagem natural com citação |
 | `GET` | `/documents` | Lista documentos indexados |
 | `DELETE` | `/documents/{id}` | Remove documento e seus chunks |
@@ -135,6 +158,41 @@ Grava as chamadas reais à OpenAI uma vez e as replica nos testes. Mais robusto 
 
 **Recursive splitter em vez de semantic chunking**
 Ganho marginal do semantic chunking não justifica a complexidade no MVP. O baseline é honesto e suficiente para o volume esperado.
+
+**Ingest assíncrono com `BackgroundTasks`, ainda sem fila/worker separado**
+`POST /documents/ingest` fazia parse, chunking, embedding e persistência
+de forma síncrona, dentro do próprio request — um documento grande
+significava o cliente esperando a conexão HTTP aberta até tudo terminar.
+Agora o endpoint faz só a parte leve (calcular sha256 do conteúdo,
+checar duplicata, criar o `Document` com `status=pending`) e responde
+`202` na hora; o trabalho pesado (`IngestService.process_document`) roda
+via `BackgroundTasks` do FastAPI, atualizando o `Document` para
+`indexed` ou `failed` ao final. `GET /documents/{id}` permite acompanhar
+essa transição.
+
+Duas consequências diretas dessa mudança, ambas deliberadas:
+- **Deduplicação por conteúdo**: `Document.content_sha256` (única no
+  banco) torna o ingest idempotente — reenviar o mesmo arquivo (mesmo
+  conteúdo, nome diferente) devolve o documento já existente em vez de
+  reprocessar, sem gastar embedding de novo. Importante porque respostas
+  assíncronas tornam retry de cliente mais provável do que no fluxo
+  síncrono anterior.
+- **Validação de conteúdo também é assíncrona**: tipo de arquivo, PDF
+  corrompido, conteúdo suspeito (prompt injection) e falha da OpenAI no
+  embedding não geram mais erro HTTP síncrono (`422`/`415`/`503`) — o
+  cliente recebe `202` e só descobre o problema consultando
+  `GET /documents/{id}` depois (`status=failed`). É uma troca real de
+  contrato de API, não um detalhe de implementação: quem consome este
+  endpoint precisa tratar validação como algo que acontece depois da
+  resposta, não durante.
+
+`BackgroundTasks` roda a tarefa no mesmo processo da API, não num worker
+separado — é o degrau mais simples de "responder rápido, processar
+depois", suficiente para provar o padrão sem a complexidade de subir uma
+fila de mensageria de verdade (Redis + processo worker distinto). Migrar
+para uma fila real é o próximo passo natural (ver issue de mensageria no
+repositório) — o contrato HTTP (`202` + `pending` + consulta de status)
+não muda nessa migração, só a mecânica de "quem" processa em background.
 
 **SystemMessage + HumanMessage em vez de prompt único concatenado**
 O prompt de geração separa instrução (`SystemMessage`, fixa, definida pelo
