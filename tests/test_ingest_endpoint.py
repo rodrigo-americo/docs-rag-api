@@ -110,6 +110,25 @@ async def test_ingest_unsupported_extension_marks_document_as_failed(client):
     assert documents[0]["status"] == "failed"
 
 
+async def test_ingest_binary_content_disguised_as_txt_marks_document_as_failed(client):
+    # Tipo de arquivo é decidido pelo conteúdo, não pela extensão do nome
+    # (ver _extract_text em app/services/ingest.py) — bytes binários
+    # inválidos em UTF-8 dentro de um .txt devem ser rejeitados, não
+    # silenciosamente aceitos como texto corrompido.
+    binary_content = b"\xff\xfe\x00\x01\x02\x03invalid utf-8 \xc0\xc1"
+    response = await client.post(
+        "/documents/ingest",
+        files={"file": ("disfarcado.txt", binary_content, "text/plain")},
+    )
+
+    assert response.status_code == 202
+
+    list_response = await client.get("/documents")
+    documents = list_response.json()
+    assert len(documents) == 1
+    assert documents[0]["status"] == "failed"
+
+
 async def test_ingest_corrupted_pdf_marks_document_as_failed(client):
     response = await client.post(
         "/documents/ingest",
