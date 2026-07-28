@@ -19,6 +19,7 @@ from app.core.exceptions import (
     SuspiciousContentError,
 )
 from app.core.logging import get_logger
+from app.core.storage import delete_upload, read_upload, save_upload
 from app.models.document import Chunk, Document, DocumentStatus
 from app.services.chunking import TextChunk, chunk_text
 from app.services.embedding import EmbeddingProvider
@@ -45,10 +46,15 @@ class IngestService:
 
     def __init__(
         self,
-        session: AsyncSession,
         embedding_provider: EmbeddingProvider,
+        session: AsyncSession | None = None,
         session_factory: Callable[[], AsyncSession] = AsyncSessionLocal,
     ) -> None:
+        # session só é usada por ingest() (fase leve, dentro de um request
+        # HTTP). process_document() (fase pesada, chamada pelo worker) nunca
+        # a usa — só session_factory, pra abrir sua própria sessão. Por isso
+        # é opcional: quem só chama process_document (o worker) não precisa
+        # fingir que tem uma sessão de request.
         self._session = session
         self._embedding = embedding_provider
         # process_document() roda em background, fora do ciclo de vida da
@@ -68,6 +74,7 @@ class IngestService:
         duplicata e cria o Document (status=pending). Roda dentro do
         request — nada de parse/embedding aqui, isso é process_document().
         """
+        assert self._session is not None, "ingest() exige session (passada no construtor)"
         size = len(content)
         max_bytes = settings.max_upload_size_mb * 1024 * 1024
         if size > max_bytes:
@@ -100,7 +107,7 @@ class IngestService:
         except IntegrityError as exc:
             raise DuplicateChunkError(filename) from exc
         await self._session.commit()
-
+        save_upload(document.id, content)
         return IngestResult(
             document_id=document.id,
             title=document.title,
@@ -122,13 +129,18 @@ class IngestService:
     async def process_document(
         self,
         document_id: uuid.UUID,
-        content: bytes,
-        filename: str,
-    ) -> None:
+    ) -> DocumentStatus | None:
         """Fase pesada do ingest: roda em background, numa sessão própria
         (a sessão do request original já fechou quando isso executa).
         Assume que o Document com `document_id` já existe (status=PENDING),
-        criado pela fase leve em `ingest()`.
+        criado pela fase leve em `ingest()`. filename vem do próprio
+        Document (source_filename) — não precisa viajar como parâmetro,
+        já que quem chama (worker) só tem o document_id vindo da fila.
+
+        Devolve o status final (INDEXED ou FAILED) pra quem chamou decidir
+        o que fazer com a mensagem da fila (ack vs retry) sem precisar
+        reconsultar o banco. None só no caso raro do Document não existir
+        mais (ver abaixo).
         """
         async with self._session_factory() as session:
             try:
@@ -139,8 +151,14 @@ class IngestService:
                     # documento pode ter sido deletado enquanto esperava
                     # processamento (corrida rara, mas possível).
                     log.warning("ingest.process_document_not_found", document_id=str(document_id))
-                    return
+                    return None
 
+                filename = doc.source_filename or "unknown"
+
+                doc.status = DocumentStatus.PROCESSING
+                await session.commit()
+
+                content = read_upload(document_id)
                 text = extract_text(content, filename)
                 chunks_data = chunk_text(text)
                 if not chunks_data:
@@ -160,6 +178,8 @@ class IngestService:
 
                 await session.commit()
                 log.info("ingest.process_document_done", document_id=str(document_id))
+                delete_upload(document_id)
+                return DocumentStatus.INDEXED
             except Exception as exc:
                 await session.rollback()
                 log.warning(
@@ -167,7 +187,13 @@ class IngestService:
                     document_id=str(document_id),
                     error=str(exc),
                 )
-                await self._mark_failed(document_id)
+                await self._mark_failed(document_id, str(exc))
+                # NÃO apaga o arquivo aqui: quem chama pode reenfileirar pra
+                # nova tentativa (ver app/worker.py), e o arquivo precisa
+                # continuar disponível pra isso. Só apaga em caso de sucesso
+                # (acima) ou quando quem chama decide que a falha é
+                # definitiva (esgotou as tentativas).
+                return DocumentStatus.FAILED
 
     def _check_suspicious_content(self, chunks_data: list[TextChunk], filename: str) -> None:
         for chunk_data in chunks_data:
@@ -215,11 +241,22 @@ class IngestService:
         session.add_all(chunk_models)
         return chunk_models
 
-    async def _mark_failed(self, document_id: uuid.UUID) -> None:
+    async def _mark_failed(self, document_id: uuid.UUID, error: str) -> None:
         """Sessão própria e separada: a sessão de `process_document` pode
-        estar em estado inválido após o rollback do erro que a levou aqui."""
+        estar em estado inválido após o rollback do erro que a levou aqui.
+
+        Por enquanto, toda falha vai direto pra FAILED (definitivo) — não há
+        requeue automático ainda, porque isso só faz sentido quando existir
+        uma fila de verdade decidindo se vale tentar de novo. retry_count e
+        last_error já são rastreados desde já, preparando o terreno pra
+        quando o worker (issue #7) passar a decidir "tenta de novo" vs
+        "desiste" usando esses mesmos campos.
+        """
         async with self._session_factory() as session:
             doc = await session.get(Document, document_id)
-            if doc is not None:
-                doc.status = DocumentStatus.FAILED
-                await session.commit()
+            if doc is None:
+                return
+            doc.retry_count += 1
+            doc.last_error = error
+            doc.status = DocumentStatus.FAILED
+            await session.commit()

@@ -42,6 +42,9 @@ class Document(Base):
         default=DocumentStatus.PENDING,
     )
     content_sha256: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         server_default=func.now(),
