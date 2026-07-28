@@ -31,6 +31,20 @@ class Settings(BaseSettings):
     # já no banco — e vice-versa.
     embedding_provider: Literal["openai", "fake"] = "fake"
     chat_provider: Literal["openai", "fake"] = "fake"
+    # --- Fila ---
+    # "inline" pra dev/teste sem Redis (chama process_document direto, no
+    # mesmo processo — equivalente ao que BackgroundTasks já fazia).
+    # "redis" enfileira de verdade, consumido por um worker separado.
+    queue_backend: Literal["inline", "redis"] = "inline"
+    redis_url: str = ""
+    ingest_queue_name: str = "ingest_queue"
+    ingest_max_retries: int = 3
+
+    @model_validator(mode="after")
+    def _require_redis_url_when_selected(self) -> "Settings":
+        if self.queue_backend == "redis" and not self.redis_url:
+            raise ValueError("REDIS_URL é obrigatória quando QUEUE_BACKEND=redis.")
+        return self
 
     @model_validator(mode="after")
     def _require_openai_key_when_selected(self) -> "Settings":
@@ -44,7 +58,13 @@ class Settings(BaseSettings):
     langsmith_api_key: str = ""
     langsmith_project: str = "docs-rag-api"
 
+    uploads_dir: str = "/data/uploads"
     max_upload_size_mb: int = 10
+    # Não é mais sobre travar o request (o worker separado processa fora
+    # do ciclo HTTP) — é sobre custo: um PDF de texto puro pode ter muitas
+    # páginas/chunks em poucos MB, e max_upload_size_mb sozinho não limita
+    # isso. Cada chunk gera uma chamada de embedding; este limite evita um
+    # único documento gerar um custo de OpenAI grande e silencioso.
     max_pdf_pages: int = 50
     chunk_size: int = 700
     chunk_overlap: int = 100

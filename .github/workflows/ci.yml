@@ -25,8 +25,20 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       DATABASE_URL: postgresql+asyncpg://docsrag:docsrag@localhost:5432/docsrag
+      REDIS_URL: redis://localhost:6379/0
+      UPLOADS_DIR: /tmp/docs-rag-uploads-ci
       EMBEDDING_PROVIDER: fake
       CHAT_PROVIDER: fake
       OPENAI_API_KEY: ""
@@ -55,5 +67,10 @@ jobs:
       - name: Run migrations
         run: uv run alembic upgrade head
 
-      - name: Run tests
-        run: uv run pytest
+      - name: Run tests (queue_backend=inline, padrão)
+        run: uv run pytest --ignore=tests/test_worker_integration.py
+
+      - name: Run worker integration tests (fila real via Redis)
+        env:
+          QUEUE_BACKEND: redis
+        run: uv run pytest tests/test_worker_integration.py -v

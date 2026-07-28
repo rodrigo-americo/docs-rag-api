@@ -30,6 +30,21 @@ services:
       start_period: 10s
     shm_size: 256mb
 
+  redis:
+    image: redis:7-alpine
+    container_name: docs-rag-redis
+    restart: unless-stopped
+    ports:
+      # Exposto no host só pra inspeção manual (redis-cli) durante o
+      # desenvolvimento deste passo — api/worker falam com `redis:6379`
+      # na rede interna do compose, não por esta porta.
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     container_name: docs-rag-api
@@ -41,11 +56,22 @@ services:
       # uso fora do compose) — dentro da rede interna o Postgres é acessível
       # pelo hostname do serviço, na porta padrão 5432.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      QUEUE_BACKEND: redis
+      UPLOADS_DIR: /data/uploads
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Compartilhado com o worker: a API grava os bytes do upload aqui
+      # (IngestService.ingest -> save_upload) e o worker lê pelo mesmo
+      # document_id (IngestService.process_document -> read_upload). Sem
+      # isso, os bytes não sobreviveriam entre dois processos diferentes.
+      - uploads_data:/data/uploads
     # Aplica migrations pendentes antes de subir o servidor. Simples e
     # suficiente pro estágio atual (single instance); em múltiplas réplicas
     # isso viraria um job separado pra evitar migrations concorrentes.
@@ -55,5 +81,29 @@ services:
       sh -c "uv run --frozen --no-sync alembic upgrade head &&
              uv run --frozen --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
+  worker:
+    build: .
+    container_name: docs-rag-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      QUEUE_BACKEND: redis
+      UPLOADS_DIR: /data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/data/uploads
+    # Sem alembic aqui: migrations já rodam no startup do serviço `api`.
+    # Dois serviços rodando "alembic upgrade head" ao mesmo tempo na
+    # inicialização é uma corrida desnecessária — só um precisa migrar.
+    command: uv run --frozen --no-sync python -m app.worker
+
 volumes:
   postgres_data:
+  uploads_data:

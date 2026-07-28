@@ -1,3 +1,7 @@
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -55,6 +59,38 @@ async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+def get_test_session_factory():
+    """Expõe a session factory de teste (NullPool) pra quem precisar abrir
+    sessões fora do ciclo normal de dependency injection — ex: testes que
+    chamam IngestService/consultam o banco diretamente, sem passar pelo
+    client HTTP. Usar AsyncSessionLocal (produção) nesses casos reproduziria
+    o mesmo "Event loop is closed" que esta engine de teste existe pra
+    evitar."""
+    return _TestSessionLocal
+
+
+async def wait_until(
+    condition: Callable[[], Awaitable[bool]],
+    timeout: float = 5.0,
+    interval: float = 0.1,
+) -> None:
+    """Espera `condition()` virar True, checando a cada `interval` segundos.
+
+    Necessário pra testes que exercitam um worker de verdade, rodando fora
+    do processo de teste: diferente do ASGITransport (que roda BackgroundTasks
+    de forma síncrona, antes do POST retornar), um worker real consumindo de
+    um Redis real processa de forma genuinamente assíncrona — não tem
+    atalho, o teste precisa checar repetidamente até o estado mudar ou
+    desistir depois de `timeout` segundos.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if await condition():
+            return
+        await asyncio.sleep(interval)
+    raise TimeoutError(f"condição não satisfeita após {timeout}s")
 
 
 @pytest.fixture

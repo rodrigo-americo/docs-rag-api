@@ -3,7 +3,6 @@ from collections.abc import Callable
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -12,6 +11,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.db import AsyncSessionLocal, get_db_session
 from app.core.exceptions import DocumentTooLargeError, IngestError
 from app.core.logging import get_logger
+from app.core.queue import InlineQueueClient, QueueClient, RedisQueueClient
 from app.core.rate_limit import limiter
 from app.models.document import Document
 from app.schemas.documents import DocumentSummary, IngestResponse
@@ -121,7 +122,6 @@ async def delete_document(
 @limiter.limit(settings.rate_limit_ingest)
 async def ingest_document(
     request: Request,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: str | None = Form(None),
     session: AsyncSession = Depends(get_db_session),
@@ -160,12 +160,31 @@ async def ingest_document(
     #    duplicata já foi (ou está sendo) processada, reenfileirar geraria
     #    chamada de embedding desperdiçada e cairia na unique constraint.
     if not result.is_duplicate:
-        background_tasks.add_task(
-            service.process_document,
-            document_id=result.document_id,
-            content=content,
-            filename=file.filename or "unknown",
-        )
+        queue_client: QueueClient
+        if settings.queue_backend == "redis":
+            # Client de vida longa, criado uma vez no lifespan (app/main.py)
+            # — não abrimos/fechamos conexão Redis a cada request. None
+            # só acontece se o lifespan não rodou (ex: ASGITransport de
+            # teste) — tratado como fila indisponível, mesmo caso do
+            # RedisError abaixo.
+            redis_client = request.app.state.redis_client
+            if redis_client is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Fila de processamento indisponível — tente novamente em instantes",
+                )
+            queue_client = RedisQueueClient(redis_client)
+            try:
+                await queue_client.enqueue(result.document_id)
+            except RedisError as exc:
+                log.warning("ingest.enqueue_failed", document_id=str(result.document_id))
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Fila de processamento indisponível — tente novamente em instantes",
+                ) from exc
+        else:
+            queue_client = InlineQueueClient(service)
+            await queue_client.enqueue(result.document_id)
 
     return IngestResponse(
         document_id=result.document_id,

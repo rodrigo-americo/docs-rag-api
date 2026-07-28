@@ -11,6 +11,7 @@ from app.api import documents, health, query
 from app.core.config import settings
 from app.core.db import engine
 from app.core.logging import configure_logging, get_logger
+from app.core.queue import get_redis_client
 from app.core.rate_limit import limiter
 
 
@@ -25,9 +26,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedding_provider=settings.embedding_provider,
         log_format=settings.log_format,
     )
+
+    # Client Redis de vida longa, criado uma vez (igual engine do Postgres
+    # abaixo) — só quando a fila real está em uso. Em queue_backend="inline"
+    # (dev/teste) não existe conexão Redis nenhuma pra abrir.
+    if settings.queue_backend == "redis":
+        app.state.redis_client = get_redis_client()
+    else:
+        app.state.redis_client = None
+
     yield
+
     # Shutdown
     log.info("app.shutdown")
+    if app.state.redis_client is not None:
+        await app.state.redis_client.aclose()
     await engine.dispose()
 
 
@@ -37,6 +50,12 @@ app = FastAPI(
     version=settings.app_version,
     lifespan=lifespan,
 )
+
+# Default antes do lifespan rodar — ASGITransport (usado nos testes) não
+# dispara lifespan, então sem isso app.state.redis_client nem existiria e
+# qualquer request com queue_backend=redis quebraria com AttributeError
+# em vez de um None tratável. O lifespan sobrescreve com o client real.
+app.state.redis_client = None
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
