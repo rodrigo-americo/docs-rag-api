@@ -17,16 +17,17 @@ Grava as chamadas reais à OpenAI uma vez e as replica nos testes. Mais robusto 
 **Recursive splitter em vez de semantic chunking**
 Ganho marginal do semantic chunking não justifica a complexidade no MVP. O baseline é honesto e suficiente para o volume esperado.
 
-**Ingest assíncrono com `BackgroundTasks`, ainda sem fila/worker separado**
+**Ingest assíncrono: API produtora + worker consumidor via Redis**
 `POST /documents/ingest` fazia parse, chunking, embedding e persistência
 de forma síncrona, dentro do próprio request — um documento grande
 significava o cliente esperando a conexão HTTP aberta até tudo terminar.
-Agora o endpoint faz só a parte leve (calcular sha256 do conteúdo,
-checar duplicata, criar o `Document` com `status=pending`) e responde
-`202` na hora; o trabalho pesado (`IngestService.process_document`) roda
-via `BackgroundTasks` do FastAPI, atualizando o `Document` para
-`indexed` ou `failed` ao final. `GET /documents/{id}` permite acompanhar
-essa transição.
+Hoje o endpoint faz só a parte leve (calcular sha256 do conteúdo, checar
+duplicata, criar o `Document` com `status=pending`, salvar os bytes no
+volume compartilhado) e responde `202` na hora; o trabalho pesado
+(`IngestService.process_document`) roda num processo `worker` separado
+(`app/worker.py`), consumindo mensagens de uma fila Redis, atualizando o
+`Document` para `processing` → `indexed`/`failed` ao longo do caminho.
+`GET /documents/{id}` permite acompanhar essa transição.
 
 Duas consequências diretas dessa mudança, ambas deliberadas:
 - **Deduplicação por conteúdo**: `Document.content_sha256` (única no
@@ -44,13 +45,92 @@ Duas consequências diretas dessa mudança, ambas deliberadas:
   endpoint precisa tratar validação como algo que acontece depois da
   resposta, não durante.
 
-`BackgroundTasks` roda a tarefa no mesmo processo da API, não num worker
-separado — é o degrau mais simples de "responder rápido, processar
-depois", suficiente para provar o padrão sem a complexidade de subir uma
-fila de mensageria de verdade (Redis + processo worker distinto). Migrar
-para uma fila real é o próximo passo natural (ver issue de mensageria no
-repositório) — o contrato HTTP (`202` + `pending` + consulta de status)
-não muda nessa migração, só a mecânica de "quem" processa em background.
+**Redis puro (`RPUSH`/`BRPOPLPUSH`/`LREM`) em vez de uma lib de fila**
+Antes de chegar num worker de verdade, o projeto passou por
+`BackgroundTasks` do FastAPI — que roda a tarefa no mesmo processo da
+API, sem fila nem processo separado algum. Suficiente pra provar
+"responder rápido, processar depois", insuficiente pra provar mensageria
+de verdade (produtor e consumidor desacoplados, comunicando só por um
+broker). Pra migrar pra Redis, a escolha foi implementar a fila na mão
+(`app/core/queue.py`) em vez de usar Celery, `arq` ou RQ:
+- **Celery** é a lib mais madura do ecossistema Python, mas não é
+  async-nativa — rodar corretamente ao lado de SQLAlchemy async/asyncpg
+  exigiria pontes (`asyncio.run()` por task, ou libs de compatibilidade
+  menos maduras) que a stack deste projeto não precisa.
+  Celery é a escolha natural quando o resto do sistema já é síncrono
+  (Django clássico, Flask sem async) — não é o caso aqui.
+- **`arq`** seria a escolha idiomática *se o objetivo fosse produção*:
+  é async-nativo, usa Redis como broker, e tem retry/agendamento prontos
+  — o equivalente ao Celery para uma stack async. Não foi escolhido
+  porque o objetivo aqui era aprender a mecânica de fila confiável na
+  prática (o que uma lib esconde por trás de `@task`/`.delay()`), não só
+  chamar uma API pronta.
+- **Redis puro** expõe as três operações que toda fila de tarefas precisa
+  resolver — publicar, consumir com segurança contra perda, e confirmar
+  — como código explícito e pequeno (`enqueue`/`dequeue`/`ack`), sem
+  esconder nenhuma delas dentro de uma dependência externa.
+
+**Fila confiável (`RPOPLPUSH`), não `BLPOP` simples**
+Um `BLPOP` puro é uma leitura destrutiva: a mensagem some da lista no
+instante em que o worker a lê, antes de terminar de processá-la — se o
+worker cair no meio, a mensagem se perde sem deixar rastro. Em vez disso,
+`dequeue()` usa `BRPOPLPUSH`, que move atomicamente a mensagem da fila
+principal (`ingest_queue`) para uma fila de "em processamento"
+(`ingest_queue:processing`). A mensagem nunca fica um instante fora de
+nenhuma lista; só sai de `:processing` quando `ack()` é chamado, depois
+do `Document` já ter sido persistido com sucesso ou definitivamente
+marcado como falho. Isso é a mesma garantia de "pelo menos uma entrega"
+(*at-least-once delivery*) que qualquer broker de mensageria real
+oferece — e é o motivo de o dedup por `content_sha256` (parágrafo acima)
+importar mais do que pareceria à primeira vista: qualquer mecanismo de
+at-least-once pode, em tese, entregar a mesma mensagem duas vezes, e é o
+dedup que torna reprocessar um documento já indexado inofensivo em vez
+de duplicar chunks.
+
+**Retry com limite, não requeue infinito**
+Cada mensagem carrega um contador `attempt`. Se `process_document` falha,
+o worker decide: se `attempt + 1 < settings.ingest_max_retries` (default
+3), reenfileira com `attempt` incrementado; caso contrário, desiste
+definitivamente (`status=failed`). `Document.retry_count` e
+`Document.last_error` (colunas dedicadas, não só um log) tornam esse
+histórico visível via `GET /documents/{id}`, sem precisar caçar em logs
+pra saber por que um documento falhou ou quantas vezes foi tentado. Um
+detalhe que só apareceu testando o caminho de falha de propósito: o
+arquivo original (salvo no volume compartilhado) não pode ser apagado na
+primeira falha — só quando o processamento termina de vez (sucesso ou
+falha definitiva) — senão a 2ª tentativa falha por um erro diferente
+(arquivo ausente) em vez de tentar de novo o problema real.
+
+**Volume Docker compartilhado para os bytes originais, não a mensagem da fila**
+A API e o worker são processos separados — os bytes do arquivo enviado
+não sobrevivem numa variável Python entre um e outro, como aconteciam
+com o closure do `BackgroundTasks`. Colocar o conteúdo do arquivo direto
+no payload do Redis funcionaria, mas é anti-padrão: infla o tamanho da
+mensagem e a fila não é feita pra carregar blobs de até 10 MB. Em vez
+disso, a API grava os bytes num volume Docker nomeado
+(`uploads_data`, montado em `/data/uploads` tanto em `api` quanto em
+`worker`) logo após criar o `Document`, e a mensagem da fila carrega
+só o `document_id` — o worker lê o arquivo do volume pelo mesmo id.
+Nada de object storage (S3/MinIO): seria a mesma armadilha de
+over-engineering já evitada ao descartar Kafka, pra um projeto de
+portfólio rodando em `docker compose`.
+
+O contrato HTTP (`202` + `pending` + consulta de status) não mudou nessa
+migração — só a mecânica de "quem" processa em background, exatamente
+como planejado quando `BackgroundTasks` foi introduzido.
+
+**`max_pdf_pages` mudou de motivo, não de valor**
+O limite de 50 páginas existia originalmente para não travar a conexão
+HTTP do cliente com um PDF grande processado de forma síncrona — motivo
+que já tinha enfraquecido com `BackgroundTasks` e desapareceu de vez com
+o worker separado (processamento fora do ciclo do request não trava
+ninguém, só demora mais numa fila que ninguém está esperando de forma
+síncrona). O limite continua existindo, mas por outra razão: custo. Um
+PDF de texto puro pode ter centenas de páginas em poucos MB —
+`max_upload_size_mb` (10 MB) não limita bem esse caso — e cada chunk
+extra gera uma chamada de embedding real na OpenAI. `max_pdf_pages`
+evita que um único documento gere um custo grande e silencioso, não que
+ele trave um request que já não existe mais no caminho síncrono.
 
 Detecção de tipo de arquivo também é por conteúdo, não por extensão do
 nome (que o cliente pode errar ou forjar): PDF é reconhecido pelos magic

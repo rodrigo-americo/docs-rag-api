@@ -60,10 +60,12 @@ curl http://localhost:8000/documents/3f1a...
 }
 ```
 
-`status` evolui `pending` → `indexed` (sucesso) ou `pending` → `failed`
-(erro de parse, tipo de arquivo não suportado, conteúdo suspeito ou falha
-da OpenAI durante o embedding — detalhes em
-[docs/decisoes-tecnicas.md](docs/decisoes-tecnicas.md)).
+`status` evolui `pending` → `processing` → `indexed` (sucesso) ou
+`pending` → `processing` → `failed` (erro de parse, tipo de arquivo não
+suportado, conteúdo suspeito ou falha da OpenAI durante o embedding —
+detalhes em [docs/decisoes-tecnicas.md](docs/decisoes-tecnicas.md)). O
+processamento roda num worker separado (`app/worker.py`), consumindo de
+uma fila Redis — a API nunca processa o documento diretamente.
 
 **Fazer uma pergunta:**
 ```bash
@@ -93,7 +95,7 @@ curl -X POST http://localhost:8000/query \
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `POST` | `/documents/ingest` | Ingere PDF ou Markdown (máx. 10 MB / 50 páginas). Responde imediatamente com `status=pending`; processamento pesado roda em background |
+| `POST` | `/documents/ingest` | Ingere PDF ou Markdown (máx. 10 MB / 50 páginas). Responde imediatamente com `status=pending`; processamento pesado é enfileirado no Redis e processado por um worker separado |
 | `GET` | `/documents/{id}` | Consulta um documento e seu status de processamento (`pending`/`indexed`/`failed`) |
 | `POST` | `/query` | Pergunta em linguagem natural com citação |
 | `GET` | `/documents` | Lista documentos indexados |
@@ -112,17 +114,35 @@ curl -X POST http://localhost:8000/query \
 - **Orquestração RAG:** LangChain + LangGraph
 - **Observabilidade:** LangSmith (tracing) + logging estruturado em JSON
 - **Testes:** pytest + pytest-asyncio + httpx + pytest-recording (VCR)
-- **CI:** GitHub Actions (lint + testes em cada PR)
+- **CI:** GitHub Actions (lint + testes em cada PR, incluindo fila real via Redis)
 - **Rate limiting:** slowapi, por IP, em `/query` e `/documents/ingest`
+- **Mensageria:** Redis (fila `RPUSH`/`BRPOPLPUSH`/`LREM` — implementada na mão, sem lib de fila) + worker em processo separado
 
 ---
 
 ## Arquitetura
 
 ```
-Client → FastAPI → Ingest Service → PostgreSQL + pgvector
-                 ↘ RAG Graph (LangGraph) ↗         ↕
-                                             OpenAI API
+                    ┌──────────────┐
+Client → FastAPI ──▶│  documents   │──▶ PostgreSQL + pgvector (status=pending)
+        (202)       │  (produtor)  │       ↑
+                    └──────┬───────┘       │ status
+                           │ enqueue       │
+                           ▼               │
+                    ┌──────────────┐       │
+                    │    Redis     │       │
+                    │ ingest_queue │       │
+                    └──────┬───────┘       │
+                           │ dequeue       │
+                           ▼               │
+                    ┌──────────────┐       │
+                    │    worker    │───────┘
+                    │ (consumidor) │──▶ OpenAI API (embeddings)
+                    └──────────────┘
+
+Client → FastAPI → RAG Graph (LangGraph) → PostgreSQL + pgvector
+                                    ↕
+                              OpenAI API
 ```
 
 ### Fluxo do RAG Graph
@@ -142,6 +162,27 @@ O branch de rewrite dispara quando nenhum chunk retornado ultrapassa o threshold
 
 ---
 
+## Avaliação
+
+Medido sobre um dataset de 34 perguntas (22 respondíveis + 12 fora de
+escopo, propositalmente adversariais) contra 3 documentos sintéticos:
+
+| Métrica | Resultado |
+|---------|-----------|
+| Recall@5 (perguntas respondíveis) | 100% (22/22) |
+| Recusa correta (fora de escopo) | 100% (12/12) |
+| Faithfulness | 0.98 (21 respostas não-recusa) |
+| Latência p50 | 1.65s |
+| Latência p95 | 4.51s |
+| Custo médio / query | US$ 0.00010 |
+
+Detalhes do dataset, como cada métrica é calculada, o viés do juiz de
+Faithfulness (medido empiricamente, não só citado como limitação) e a
+calibração do `retrieval_quality_threshold` via sweep em
+[docs/avaliacao.md](docs/avaliacao.md).
+
+---
+
 ## Mais detalhes
 
 Este README cobre o essencial. Para o raciocínio completo por trás das
@@ -152,6 +193,7 @@ decisões do projeto:
   rate limiting, e outras escolhas de arquitetura.
 - **[docs/seguranca.md](docs/seguranca.md)** — o que a API protege
   (e o que não protege, por decisão de escopo).
-- **[docs/avaliacao.md](docs/avaliacao.md)** — dataset, métricas
-  (Recall@5, Faithfulness, latência, custo), viés do juiz de
-  Faithfulness, e a calibração do threshold de retrieval.
+- **[docs/avaliacao.md](docs/avaliacao.md)** — dataset completo, como
+  cada métrica é calculada, viés do juiz de Faithfulness, e a
+  calibração do threshold de retrieval (a tabela principal já está
+  na seção Avaliação acima).
