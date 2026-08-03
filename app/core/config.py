@@ -86,6 +86,29 @@ class Settings(BaseSettings):
     # encontrei" do que fazer o usuário esperar mais rodadas de LLM.
     max_rewrite_attempts: int = 2
 
+    # --- Hybrid search (BM25 + dense, fundidos por RRF) ---
+    # Quando ligado, retrieve roda search_similar_chunks e search_bm25_chunks
+    # em paralelo e funde os dois rankings via reciprocal_rank_fusion — ver
+    # docs/roadmap.md, linha "Hybrid (BM25 + dense)" da tabela de ablation.
+    # Default True: é o pipeline medido (Recall@5 100%, ver README/avaliacao.md),
+    # estritamente melhor que Dense sozinho no dataset de avaliação — Dense
+    # continua acessível via HYBRID_SEARCH_ENABLED=false, preservado como
+    # baseline de comparação no ablation, não removido.
+    hybrid_search_enabled: bool = True
+    # Sweep sobre as 34 perguntas do dataset de avaliação (best_similarity
+    # do RRF, k=60): quase todos os scores colam em 1/61≈0.01639 (chunk que
+    # aparece na posição 1 de uma única lista, dense OU bm25) e essa faixa
+    # NÃO separa pergunta respondível de fora-de-escopo — o range observado
+    # inteiro foi [0.01639, 0.03279], e 0.01639 aparece tanto em HIT quanto
+    # em OOS. Diferente de cosine similarity, RRF nesta escala não é um
+    # sinal discriminativo o suficiente pra decidir rewrite. Threshold
+    # abaixo do mínimo observado desliga o gate na prática — a recusa por
+    # falta de contexto fica inteiramente a cargo do answerable=False do
+    # LLM (GeneratedAnswer), que já é quem decide isso hoje mesmo no modo
+    # Dense quando o retrieval tecnicamente "passa" no threshold mas o
+    # conteúdo não responde a pergunta.
+    retrieval_quality_threshold_rrf: float = 0.005
+
     # --- Logging ---
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "console"

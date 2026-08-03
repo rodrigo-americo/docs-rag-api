@@ -3,9 +3,9 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import Computed, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy import Enum as SQLAlchemyEnum
-from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -83,6 +83,13 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(
         Vector(EMBEDDING_DIM),
+        nullable=False,
+    )
+    # Gerada pelo Postgres a partir de content (ver migration 9f3c1a7b2d4e) —
+    # o ORM nunca escreve nesta coluna, só lê para a busca BM25.
+    content_tsv: Mapped[str] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('portuguese', content)", persisted=True),
         nullable=False,
     )
 

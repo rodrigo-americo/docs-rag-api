@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.rag.retrieval import search_similar_chunks
+from app.rag.retrieval import (
+    reciprocal_rank_fusion,
+    search_bm25_chunks,
+    search_similar_chunks,
+)
 from app.rag.state import RagState
 from app.services.chat import ChatProvider
 from app.services.embedding import EmbeddingProvider
@@ -34,11 +38,31 @@ def make_retrieve_node(
     async def retrieve(state: RagState) -> dict:
         question = state["rewritten_question"] or state["question"]
         query_embedding = await embedding_provider.embed_query(question)
-        chunks = await search_similar_chunks(
+
+        if not settings.hybrid_search_enabled:
+            chunks = await search_similar_chunks(
+                session=session,
+                query_embedding=query_embedding,
+                top_k=state["top_k"],
+            )
+            return {"retrieved_chunks": chunks}
+
+        # Sequencial, não asyncio.gather: as duas buscas dividem a mesma
+        # AsyncSession, que não suporta operações concorrentes na mesma
+        # conexão (SQLAlchemy levanta InvalidRequestError). Ambas são
+        # queries locais ao Postgres — o custo de rodar em série é
+        # marginal comparado às chamadas de LLM do resto do grafo.
+        dense_chunks = await search_similar_chunks(
             session=session,
             query_embedding=query_embedding,
             top_k=state["top_k"],
         )
+        bm25_chunks = await search_bm25_chunks(
+            session=session,
+            query_text=question,
+            top_k=state["top_k"],
+        )
+        chunks = reciprocal_rank_fusion(dense_chunks, bm25_chunks)
         return {"retrieved_chunks": chunks}
 
     return retrieve
@@ -49,8 +73,14 @@ def decide_after_retrieve(state: RagState) -> str:
         return "generate_answer"
     if not state["retrieved_chunks"]:
         return "rewrite_query"
+
+    threshold = (
+        settings.retrieval_quality_threshold_rrf
+        if settings.hybrid_search_enabled
+        else settings.retrieval_quality_threshold
+    )
     best_similarity = max(c.similarity for c in state["retrieved_chunks"])
-    if best_similarity < settings.retrieval_quality_threshold:
+    if best_similarity < threshold:
         return "rewrite_query"
 
     return "generate_answer"
