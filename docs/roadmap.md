@@ -14,7 +14,7 @@ pra valer a complexidade" é defensável, se for medido.
 | Pipeline | Recall@5 | Faithfulness | custo | tempo
 |---|---|---|---|---|
 | Dense (baseline atual) | 96% (22/23) | 1.00 | US$ 0.00046/query | p50 3.36s / p95 10.92s |
-| Dense + rewrite | — | — | | |
+| Dense + rewrite | 96% (22/23) | 1.00 | US$ 0.00045/query | p50 2.35s / p95 7.36s |
 | Hybrid (BM25 + dense) | — | — | | |
 | Hybrid + RAPTOR | — | — | | |
 
@@ -29,27 +29,32 @@ termo exato. É evidência concreta, não hipotética, do tipo de gap que a
 linha "Hybrid (BM25 + dense)" existe para fechar (busca por termo exato
 resolveria isso de cara).
 
+O rewrite dispara em 11/34 perguntas (`MAX_REWRITE_ATTEMPTS=2`,
+`retrieval_quality_threshold=0.6`) e não muda Recall@5 nem Faithfulness
+em relação ao Dense puro — inclusive falha no mesmo caso CRI/CRA, dois
+rewrites incluídos. Custo por query ficou estatisticamente igual
+(US$ 0.00045 vs 0.00046). A latência medida ficou menor com rewrite (p50
+3.36s → 2.35s, p95 10.92s → 7.36s), mas isso é contraintuitivo — rewrite
+adiciona 1-2 chamadas de LLM extras por pergunta afetada, então deveria
+somar tempo, não reduzir. O grafo não tem nenhum outro loop de retry que
+o rewrite estaria evitando (`decide_after_retrieve` só decide entre
+`rewrite_query` e `generate_answer`), então não há mecanismo no código
+que explique a queda. Cada rodada foi uma única execução do dataset em
+momentos diferentes — a diferença é mais provável de ser variância de
+latência da API da OpenAI entre chamadas do que um efeito real do
+rewrite. Não tratar essa queda de latência como conclusão sem repetir a
+medição (múltiplas rodadas, mesma janela de tempo) antes de citá-la.
+
 ### Ordem de trabalho
 
-1. **Linha "Dense"** — já é o comportamento atual (retrieval só por
-   similaridade vetorial, sem rewrite). Rodar o eval como está hoje e
-   registrar o número na tabela — isso já existe, só falta capturar
-   formalmente como baseline antes de mexer em mais nada.
-
-2. **Linha "Dense + rewrite"** — quantificar o ganho real do branch de
-   rewrite do LangGraph (quantas perguntas só acertam graças à
-   reformulação, latência/custo adicional que ele introduz). Maior parte
-   da infraestrutura já existe (`retry_count` no estado do grafo, dataset
-   de eval já força o branch em 11/34 perguntas hoje).
-
-3. **Linha "Hybrid (BM25 + dense)"** — combina busca por similaridade
+1. **Linha "Hybrid (BM25 + dense)"** — combina busca por similaridade
    semântica (o que já existe) com busca por termo exato (BM25) —
    resolve o caso onde embedding sozinho erra por termos muito
    específicos (nomes próprios, códigos, jargão exato). Padrão real de
    indústria, maior valor de defesa entre as mudanças de arquitetura
    antes do RAPTOR.
 
-4. **Linha "Hybrid + RAPTOR"** — plano detalhado completo em
+2. **Linha "Hybrid + RAPTOR"** — plano detalhado completo em
    [planos/raptor-chunking.md](planos/raptor-chunking.md). Só entra na
    tabela depois que "Hybrid" sozinho já está medido — o ponto inteiro é
    ver se a árvore soma valor em cima do hybrid search, não assumir que
