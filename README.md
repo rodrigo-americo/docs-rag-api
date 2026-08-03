@@ -197,3 +197,6 @@ decisões do projeto:
   cada métrica é calculada, viés do juiz de Faithfulness, e a
   calibração do threshold de retrieval (a tabela principal já está
   na seção Avaliação acima).
+- **[docs/roadmap.md](docs/roadmap.md)** — próximos passos, organizados
+  como ablation study do pipeline de retrieval. Planos detalhados de
+  itens maiores (ex: RAPTOR) vivem em `docs/planos/`.
