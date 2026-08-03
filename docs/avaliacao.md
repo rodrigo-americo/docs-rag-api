@@ -22,6 +22,23 @@ conta como acerto de recall.
 > específicos (tabelas de sweep, scores de Faithfulness por caso) não
 > foram re-medidos contra o dataset novo.
 
+Resultado com o pipeline atual, retrieval híbrido
+(`HYBRID_SEARCH_ENABLED=true`, o padrão — busca densa + BM25 fundidos por
+Reciprocal Rank Fusion, ver [Decisões técnicas](decisoes-tecnicas.md)):
+
+| Métrica | Resultado |
+|---------|-----------|
+| Recall@5 (perguntas respondíveis) | 100% (23/23) |
+| Rewrite disparado | 0/34 perguntas |
+| Recusa correta (fora de escopo) | 100% (11/11) |
+| Faithfulness | 1.00 (22 respostas não-recusa) |
+| Latência p50 | 1.77s |
+| Latência p95 | 3.13s |
+| Custo médio / query | US$ 0.00075 |
+
+Com `HYBRID_SEARCH_ENABLED=false` (retrieval só-denso, baseline "Dense" do
+[roadmap](roadmap.md)):
+
 | Métrica | Resultado |
 |---------|-----------|
 | Recall@5 (perguntas respondíveis) | 96% (22/23) |
@@ -32,14 +49,24 @@ conta como acerto de recall.
 | Latência p95 | 10.92s |
 | Custo médio / query | US$ 0.00046 |
 
-A única falha de recall (1/23) é a pergunta sobre CRI/CRA (siglas exatas)
-no glossário do BCB: mesmo após 2 rewrites, o retrieval denso nunca traz
-o chunk certo — os 5 chunks recuperados são todos sobre outras
-modalidades de crédito, vizinhos temáticos que erram o termo exato. A
-resposta do sistema ("não encontrei") é correta dado o contexto que
-recebeu — a falha é de retrieval, não de geração. Ver
-[roadmap](roadmap.md) para como isso motiva a linha "Hybrid" da tabela de
-ablation.
+A única falha de recall do modo só-denso (1/23) é a pergunta sobre
+CRI/CRA (siglas exatas) no glossário do BCB: mesmo após 2 rewrites, o
+retrieval denso nunca traz o chunk certo — os 5 chunks recuperados são
+todos sobre outras modalidades de crédito, vizinhos temáticos que erram o
+termo exato. A resposta do sistema ("não encontrei") é correta dado o
+contexto que recebeu — a falha é de retrieval, não de geração. É esse
+caso, concreto e medido (não hipotético), que o retrieval híbrido
+resolve: BM25 encontra o chunk certo por match de termo exato, RRF o
+promove ao top-5 fundido. Comparação completa e detalhes de calibração
+(threshold de RRF, fix da tsquery para perguntas longas) em
+[roadmap](roadmap.md).
+
+Custo por query do modo híbrido é maior (US$ 0.00075 vs 0.00046) porque
+`rewrite` nunca dispara (0/34 vs 11/34) — toda pergunta chega em
+`generate_answer` na primeira tentativa, gerando uma resposta completa em
+vez de, em parte dos casos do modo denso, gastar parte do orçamento numa
+chamada de reformulação mais barata. Latência é menor pelo mesmo motivo
+(sem chamada extra de LLM para reformular).
 
 Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=700`
 (padrão — diferente da rodada anterior, que usava `chunk_size=150` porque
@@ -166,6 +193,32 @@ trechos diferentes (ex: taxa de multa de um chunk + valor total de outro) —
 LLMs erram aritmética com frequência maior do que aparentam, e esse tipo de
 inferência silenciosa é mais difícil de auditar do que citar os valores
 como aparecem no texto.
+
+## Calibração do `retrieval_quality_threshold_rrf`
+
+O retrieval híbrido funde busca densa e BM25 por posição (Reciprocal Rank
+Fusion, k=60, ver [Decisões técnicas](decisoes-tecnicas.md)) — o score
+resultante não é cosine similarity e não pode reusar o threshold `0.6`
+calibrado para essa escala. Um sweep retrieval-only (sem LLM) sobre as 34
+perguntas mediu `best_similarity` do resultado fundido:
+
+- Range observado inteiro: `[0.01639, 0.03279]` — uma faixa muito mais
+  estreita que a de cosine similarity (que vai de ~0 a ~1).
+- A maioria dos scores (perguntas respondíveis **e** fora de escopo) cai
+  exatamente em `0.01639` (= 1/61, o score de um chunk que aparece na
+  posição 1 de uma única lista, dense ou BM25, mas não das duas). Esse
+  valor aparece nos dois grupos — diferente do sweep de cosine acima, não
+  existe corte que separe as duas populações nessa escala.
+
+Como o score não é discriminativo o suficiente para decidir rewrite,
+`retrieval_quality_threshold_rrf=0.005` fica abaixo do mínimo observado —
+o gate de rewrite por score fica efetivamente desligado no modo híbrido,
+e a recusa por falta de contexto passa a depender inteiramente de
+`answerable=False` do LLM (mesmo mecanismo que já decide isso no modo
+denso quando o retrieval "passa" no threshold mas o conteúdo não responde
+a pergunta). Na prática, isso zera o rewrite no eval (0/34, contra 11/34
+no modo denso) sem custar Recall@5 nem recusa correta — ver tabela
+comparativa no topo deste documento.
 
 ## Como rodar a avaliação
 

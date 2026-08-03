@@ -108,9 +108,10 @@ curl -X POST http://localhost:8000/query \
 ## Stack
 
 - **API:** FastAPI + Pydantic v2
-- **Banco:** PostgreSQL 16 + pgvector
+- **Banco:** PostgreSQL 16 + pgvector + full-text search nativo (`tsvector`/GIN)
 - **ORM:** SQLAlchemy 2.0 (async) + Alembic
 - **LLM/Embeddings:** OpenAI (`gpt-4o-mini` + `text-embedding-3-small`)
+- **Retrieval:** híbrido — busca densa (pgvector, cosine) + BM25-like (Postgres full-text) fundidos por Reciprocal Rank Fusion
 - **Orquestração RAG:** LangChain + LangGraph
 - **Observabilidade:** LangSmith (tracing) + logging estruturado em JSON
 - **Testes:** pytest + pytest-asyncio + httpx + pytest-recording (VCR)
@@ -148,17 +149,26 @@ Client → FastAPI → RAG Graph (LangGraph) → PostgreSQL + pgvector
 ### Fluxo do RAG Graph
 
 ```
-[query] → [retrieve top-k] → [check quality]
-                                    ↓
-                   ┌────────────────┴────────────────┐
-                   ▼ scores baixos                   ▼ ok
-             [rewrite query]                  [build context]
-             [retrieve again] ──────────────▶ [generate answer]
-                                                     ↓
-                                            [resposta + citações]
+[query] ──▶ [retrieve: dense (pgvector) + BM25 (full-text), fundidos por RRF] ──▶ [check quality]
+                                                                                        ↓
+                                       ┌────────────────────────────────────────────────┴──────┐
+                                       ▼ score baixo                                           ▼ ok
+                                 [rewrite query]                                       [build context]
+                                 [retrieve again] ─────────────────────────────────▶ [generate answer]
+                                                                                              ↓
+                                                                                     [resposta + citações]
 ```
 
-O branch de rewrite dispara quando nenhum chunk retornado ultrapassa o threshold de similaridade — em vez de gerar uma resposta com retrieval ruim, o grafo reformula a pergunta e tenta novamente.
+`retrieve` roda busca densa (similaridade de embedding) e busca por termo
+exato (BM25-like, via `tsvector`/`ts_rank_cd` do Postgres) e funde os dois
+rankings por posição (Reciprocal Rank Fusion) — resolve o caso em que o
+termo certo existe no documento, mas embedding sozinho recupera vizinhos
+temáticos em vez do chunk exato (siglas, códigos, jargão específico). O
+branch de rewrite dispara quando o resultado fundido ainda fica abaixo do
+threshold de qualidade — em vez de gerar uma resposta com retrieval ruim,
+o grafo reformula a pergunta e tenta de novo. Desligável via
+`HYBRID_SEARCH_ENABLED=false` (volta a usar só a busca densa — ver
+[docs/roadmap.md](docs/roadmap.md) para a comparação medida entre os dois modos).
 
 ---
 
@@ -167,20 +177,27 @@ O branch de rewrite dispara quando nenhum chunk retornado ultrapassa o threshold
 Medido sobre um dataset de 34 perguntas (23 respondíveis + 11 fora de
 escopo) contra 3 documentos reais de finanças e direito (Glossário de
 Crédito do Banco Central, Guia CVM de Fundos Imobiliários, Cartilha do
-Consumidor do Ministério da Justiça):
+Consumidor do Ministério da Justiça), com o retrieval híbrido (padrão,
+`HYBRID_SEARCH_ENABLED=true`):
 
 | Métrica | Resultado |
 |---------|-----------|
-| Recall@5 (perguntas respondíveis) | 96% (22/23) |
+| Recall@5 (perguntas respondíveis) | 100% (23/23) |
 | Recusa correta (fora de escopo) | 100% (11/11) |
-| Faithfulness | 1.00 (21 respostas não-recusa) |
-| Latência p50 | 3.36s |
-| Latência p95 | 10.92s |
-| Custo médio / query | US$ 0.00046 |
+| Faithfulness | 1.00 (22 respostas não-recusa) |
+| Latência p50 | 1.77s |
+| Latência p95 | 3.13s |
+| Custo médio / query | US$ 0.00075 |
+
+Com retrieval só-denso (`HYBRID_SEARCH_ENABLED=false`), Recall@5 cai para
+96% (22/23) — o único caso que o BM25 resolve é uma pergunta sobre siglas
+exatas (CRI/CRA) onde o embedding recupera vizinhos temáticos em vez do
+chunk certo. Comparação completa entre os pipelines (Dense, Dense +
+rewrite, Hybrid) em [docs/roadmap.md](docs/roadmap.md).
 
 Detalhes do dataset, como cada métrica é calculada, o viés do juiz de
 Faithfulness (medido empiricamente, não só citado como limitação) e a
-calibração do `retrieval_quality_threshold` via sweep em
+calibração dos thresholds de qualidade de retrieval via sweep em
 [docs/avaliacao.md](docs/avaliacao.md).
 
 ---

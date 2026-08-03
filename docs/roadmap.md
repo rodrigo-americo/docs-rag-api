@@ -13,9 +13,9 @@ pra valer a complexidade" é defensável, se for medido.
 
 | Pipeline | Recall@5 | Faithfulness | custo | tempo
 |---|---|---|---|---|
-| Dense (baseline atual) | 96% (22/23) | 1.00 | US$ 0.00046/query | p50 3.36s / p95 10.92s |
+| Dense (baseline inicial) | 96% (22/23) | 1.00 | US$ 0.00046/query | p50 3.36s / p95 10.92s |
 | Dense + rewrite | 96% (22/23) | 1.00 | US$ 0.00045/query | p50 2.35s / p95 7.36s |
-| Hybrid (BM25 + dense) | — | — | | |
+| **Hybrid (BM25 + dense) — padrão atual** | 100% (23/23) | 1.00 | US$ 0.00075/query | p50 1.77s / p95 3.13s |
 | Hybrid + RAPTOR | — | — | | |
 
 Cada linha só é adicionada depois que a anterior está medida e registrada
@@ -45,14 +45,53 @@ latência da API da OpenAI entre chamadas do que um efeito real do
 rewrite. Não tratar essa queda de latência como conclusão sem repetir a
 medição (múltiplas rodadas, mesma janela de tempo) antes de citá-la.
 
+A linha "Hybrid" fecha o gap: busca por termo exato (BM25, full-text
+search do Postgres com `tsvector`/`ts_rank_cd`) rodando em paralelo com o
+retrieval denso existente, fundidos por Reciprocal Rank Fusion (RRF,
+k=60, sem normalização de score — só posição em cada lista). O caso
+CRI/CRA que o Dense sempre errava agora acerta: BM25 encontra o chunk por
+match de termo exato mesmo quando o embedding não. Recall@5 vai de 22/23
+para 23/23.
+
+Dois ajustes de calibração foram necessários e não são óbvios de antemão:
+
+- **`websearch_to_tsquery` não serve para perguntas longas.** Ele une
+  todos os termos com AND — numa pergunta de 11 palavras, nenhum chunk
+  contém todas simultaneamente e a busca BM25 retornava 0 resultados
+  (incluindo, ironicamente, para a própria pergunta de CRI/CRA). A
+  correção foi reescrever a tsquery trocando `&` por `|` (OR entre
+  termos): um único termo específico batendo já produz match, e
+  `ts_rank_cd` naturalmente ranqueia mais alto quem bate mais termos —
+  ver `search_bm25_chunks` em `app/rag/retrieval.py`.
+- **O threshold de rewrite precisa de uma escala própria pro RRF.**
+  `retrieval_quality_threshold=0.6` foi calibrado para cosine similarity
+  (0-1, boa separação entre pergunta respondível e fora-de-escopo). RRF
+  produz scores numa faixa muito mais estreita (~0.016-0.033 no sweep das
+  34 perguntas do dataset) e, nessa escala, o score não separa
+  respondível de fora-de-escopo — o mesmo valor (1/61≈0.01639) aparece
+  nos dois grupos. Não existe corte que funcione bem aqui: em vez de
+  calibrar um ponto de corte que não existe, `retrieval_quality_threshold_rrf`
+  ficou abaixo do mínimo observado (0.005), desligando o gate de score na
+  prática — a recusa por falta de contexto passa a ser decidida
+  inteiramente pelo `answerable=False` do LLM (`GeneratedAnswer`), que já
+  é quem decide isso mesmo quando o retrieval "passa" no threshold mas o
+  conteúdo não responde à pergunta.
+
+O efeito colateral da calibração acima: rewrite nunca dispara no modo
+Hybrid (0/34, contra 11/34 no Dense), o que também explica a queda de
+latência (p50 3.36s → 1.77s) — sem chamada extra de LLM pra reformular. O
+custo por query subiu (US$ 0.00046 → 0.00075) na direção oposta: com 0
+rewrites, toda pergunta chega em `generate_answer` de primeira, gerando
+uma resposta completa (mais tokens de output) em vez de, em alguns casos
+do modo Dense, gastar esse orçamento em uma chamada de reformulação mais
+barata. Essa é a explicação mais plausível, mas não foi isolada por
+medição controlada (mesmo padrão de cautela já registrado acima pra
+variação de latência do rewrite) — não tratar como conclusão fechada sem
+comparar token-a-token entre os dois modos.
+
 ### Ordem de trabalho
 
-1. **Linha "Hybrid (BM25 + dense)"** — combina busca por similaridade
-   semântica (o que já existe) com busca por termo exato (BM25) —
-   resolve o caso onde embedding sozinho erra por termos muito
-   específicos (nomes próprios, códigos, jargão exato). Padrão real de
-   indústria, maior valor de defesa entre as mudanças de arquitetura
-   antes do RAPTOR.
+1. ~~**Linha "Hybrid (BM25 + dense)"**~~ — feito, ver acima.
 
 2. **Linha "Hybrid + RAPTOR"** — plano detalhado completo em
    [planos/raptor-chunking.md](planos/raptor-chunking.md). Só entra na
