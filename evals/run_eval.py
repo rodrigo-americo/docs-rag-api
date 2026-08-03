@@ -44,7 +44,10 @@ def _count_tokens(text: str) -> int:
 @dataclass
 class QueryTrace:
     question: str
-    expected_chunk_id: str | None
+    # list quando o conteúdo esperado aparece em mais de um chunk do
+    # documento-fonte (repetição real do texto) — qualquer um dos ids
+    # conta como acerto, não só o primeiro que o dataset registrou.
+    expected_chunk_id: str | list[str] | None
     out_of_scope: bool
     retrieved_chunk_ids: list[str]
     answer: str
@@ -79,7 +82,7 @@ NOTA:"""
 
 
 async def _run_single_query(
-    question: str, expected_chunk_id: str | None, out_of_scope: bool
+    question: str, expected_chunk_id: str | list[str] | None, out_of_scope: bool
 ) -> QueryTrace:
     embedding_provider = get_embedding_provider()
     chat_provider = get_chat_provider()
@@ -140,7 +143,10 @@ async def _judge_faithfulness(trace: QueryTrace) -> float:
 
 
 def _recall_at_k(trace: QueryTrace) -> bool:
-    return trace.expected_chunk_id in trace.retrieved_chunk_ids
+    expected = trace.expected_chunk_id
+    if isinstance(expected, list):
+        return any(chunk_id in trace.retrieved_chunk_ids for chunk_id in expected)
+    return expected in trace.retrieved_chunk_ids
 
 
 def _correctly_refused(trace: QueryTrace) -> bool:

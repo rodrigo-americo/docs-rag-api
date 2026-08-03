@@ -12,14 +12,22 @@ complexidade adicionada — inclusive o resultado "não ajudou o suficiente
 pra valer a complexidade" é defensável, se for medido.
 
 | Pipeline | Recall@5 | Faithfulness | custo | tempo
-|---|---|---|
-| Dense (baseline atual) | — | — |
-| Dense + rewrite | — | — |
-| Hybrid (BM25 + dense) | — | — |
-| Hybrid + RAPTOR | — | — |
+|---|---|---|---|---|
+| Dense (baseline atual) | 96% (22/23) | 1.00 | US$ 0.00046/query | p50 3.36s / p95 10.92s |
+| Dense + rewrite | — | — | | |
+| Hybrid (BM25 + dense) | — | — | | |
+| Hybrid + RAPTOR | — | — | | |
 
 Cada linha só é adicionada depois que a anterior está medida e registrada
 — nada de implementar a próxima camada antes de ter o número da atual.
+
+A única falha de recall do baseline "Dense" (1/23) é a pergunta sobre CRI
+e CRA (siglas exatas) no glossário do BCB: mesmo após 2 rewrites, o
+retrieval denso nunca recupera o chunk certo — os 5 chunks retornados são
+todos sobre outras modalidades de crédito, vizinhos temáticos que erram o
+termo exato. É evidência concreta, não hipotética, do tipo de gap que a
+linha "Hybrid (BM25 + dense)" existe para fechar (busca por termo exato
+resolveria isso de cara).
 
 ### Ordem de trabalho
 
@@ -47,11 +55,14 @@ Cada linha só é adicionada depois que a anterior está medida e registrada
    ver se a árvore soma valor em cima do hybrid search, não assumir que
    soma. Maior escopo e risco da lista.
 
-**RAGAS** entra como fonte de métrica pra preencher as colunas acima
-(Faithfulness em especial), ao lado da metodologia própria já existente
-e documentada (viés de juiz medido empiricamente, threshold calibrado
-por sweep) — não é uma linha separada da tabela, é parte de como as
-colunas são calculadas.
+As colunas acima são preenchidas pela metodologia própria já existente e
+documentada (Recall@5 exato por `chunk_id`, Faithfulness com viés de juiz
+medido empiricamente, threshold calibrado por sweep — ver
+[avaliacao.md](avaliacao.md)). RAGAS foi avaliado como fonte adicional de
+métrica (Context Precision, Response Relevancy) mas está bloqueado por
+incompatibilidade de dependências — toda versão publicada exige uma
+stack LangChain incompatível com a deste projeto (detalhes e caminho
+viável não implementado em [avaliacao.md](avaliacao.md#ragas--bloqueado-por-incompatibilidade-de-dependências)).
 
 ## Trilha paralela: tipos de arquivo (não bloqueia a tabela acima)
 

@@ -27,15 +27,17 @@ async def main() -> None:
     async with AsyncSessionLocal() as session:
         service = IngestService(session=session, embedding_provider=embedding_provider)
 
-        for file_path in sorted(DOCUMENTS_DIR.glob("*.txt")):
+        for file_path in sorted(DOCUMENTS_DIR.glob("*.pdf")):
             content = file_path.read_bytes()
             result = await service.ingest(content=content, filename=file_path.name)
-            print(f"Ingerido: {file_path.name} -> {result.chunks_created} chunks")
-
-        # IngestService só dá flush() — commit é responsabilidade de quem chama
-        # (normalmente get_db_session, no request HTTP). Sem isso, tudo some
-        # ao fechar a sessão no fim do `async with`.
-        await session.commit()
+            # ingest() só cria o Document (status=PENDING) e salva o upload —
+            # é a fase leve, pensada pra rodar dentro de um request HTTP que
+            # depois enfileira o processamento pro worker (app/worker.py).
+            # Aqui não há fila: chamamos process_document() direto, síncrono,
+            # pra gerar chunks e embeddings de verdade sem precisar subir
+            # Redis + worker só pra montar o dataset de avaliação.
+            status = await service.process_document(result.document_id)
+            print(f"Ingerido: {file_path.name} -> status={status}")
 
         stmt = (
             select(Chunk, Document.title)

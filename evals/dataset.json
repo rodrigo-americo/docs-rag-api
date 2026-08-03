@@ -1,149 +1,171 @@
 [
   {
-    "question": "Qual o objeto do contrato de prestação de serviços da TechConsult?",
-    "expected_chunk_id": "b50e47e9-c5f8-44be-9152-ce438794794b"
+    "question": "Como é calculada a relação Crédito/PIB segundo o glossário do Banco Central?",
+    "expected_chunk_id": "2f2821a2-4196-4161-a260-1e45552eccf6",
+    "reference_answer": "É a relação do saldo das operações de crédito dividido pelo valor do PIB acumulado nos últimos doze meses em valores correntes."
   },
   {
-    "question": "Qual o prazo de entrega acordado no contrato de serviço?",
-    "expected_chunk_id": "06dde965-f58a-42db-8860-63165a07a21f"
+    "question": "O que é considerado inadimplência da carteira de crédito, segundo o BCB?",
+    "expected_chunk_id": "2f2821a2-4196-4161-a260-1e45552eccf6",
+    "reference_answer": "É o somatório do saldo das operações de crédito com atraso acima de 90 dias e não baixado para prejuízo, dividido pelo saldo total de crédito da carteira."
   },
   {
-    "question": "Qual a multa por atraso não comunicado na entrega do contrato de serviço?",
-    "expected_chunk_id": "06dde965-f58a-42db-8860-63165a07a21f"
+    "question": "Qual o critério de faturamento anual que classifica uma empresa como Micro, Pequena ou Média Empresa (MPME)?",
+    "expected_chunk_id": "b75ba3f8-a6d8-4624-a0fa-9e95cbced59b",
+    "reference_answer": "MPME é a empresa com receita bruta anual até R$300 milhões ou ativo total até R$240 milhões."
   },
   {
-    "question": "Qual o valor total do contrato de prestação de serviços e como ele é parcelado?",
-    "expected_chunk_id": "5e2ed9ed-005a-4f00-8cf4-ddd03ba67b9c"
+    "question": "O que é o spread médio na definição do glossário de crédito do Banco Central?",
+    "expected_chunk_id": "b75ba3f8-a6d8-4624-a0fa-9e95cbced59b",
+    "reference_answer": "É a diferença entre a taxa média de juros e o custo de captação estimado para cada modalidade."
   },
   {
-    "question": "Quantos dias de garantia a TechConsult oferece após a entrega final do software?",
-    "expected_chunk_id": "6e70889e-85f3-43f7-b5d0-40f018cb06a6"
+    "question": "Qual a diferença entre cartão de crédito parcelado e cartão de crédito rotativo, segundo o glossário do BCB?",
+    "expected_chunk_id": "cbe88200-64cc-4e67-a311-62ff97c203d5",
+    "reference_answer": "Cartão de crédito parcelado é o parcelamento das compras ou da fatura mediante cobrança de juros. Cartão de crédito rotativo é o financiamento do saldo devedor remanescente após o pagamento parcial da fatura."
   },
   {
-    "question": "Por quanto tempo dura a obrigação de confidencialidade após o fim do contrato de serviço?",
-    "expected_chunk_id": "45e71bf3-e9be-48fc-8fb6-e0b003f0a83b"
+    "question": "O que caracteriza a modalidade de crédito 'Vendor' segundo o glossário do Banco Central?",
+    "expected_chunk_id": "8443ef25-42a2-41f5-9be6-f4ec90ccca36",
+    "reference_answer": "Vendor é o financiamento de vendas baseado na cessão de crédito: a empresa vendedora recebe à vista da instituição financeira, e a empresa compradora assume o compromisso de pagar a prazo à instituição financeira, que fica com os direitos creditórios e o risco da operação."
   },
   {
-    "question": "Qual a multa em caso de rescisão antecipada do contrato pela CONTRATANTE sem justa causa?",
-    "expected_chunk_id": "45e71bf3-e9be-48fc-8fb6-e0b003f0a83b"
+    "question": "O que são Certificados de Recebíveis Imobiliários (CRI) e Certificados de Recebíveis do Agronegócio (CRA) segundo o glossário do BCB?",
+    "expected_chunk_id": "02107962-e387-46ac-9869-30db8f4460c5",
+    "reference_answer": "São instrumentos de securitização emitidos por companhias securitizadoras, lastreados em operações de crédito do SFN ou geradas fora do sistema financeiro."
   },
   {
-    "question": "Qual o foro eleito para resolver disputas do contrato de prestação de serviços?",
-    "expected_chunk_id": "705d092d-a37e-4598-95ce-3458a7472baf"
+    "question": "Como é composto o M1 (meios de pagamento de conceito restrito) segundo o glossário do Banco Central?",
+    "expected_chunk_id": "f6b504df-f3f7-4246-9b11-7bf8fbfc6405",
+    "reference_answer": "O M1 é composto pelo papel-moeda em poder do público mais os depósitos à vista."
   },
   {
-    "question": "Quais documentos um novo colaborador precisa levar no primeiro dia de trabalho?",
-    "expected_chunk_id": "51b881bc-dd51-49d4-a132-bb9b7f7999a7"
+    "question": "Quais são os dois tipos de garantia previstos no Código de Defesa do Consumidor?",
+    "expected_chunk_id": "65fc840a-f6cc-4834-949d-d60d116bc777",
+    "reference_answer": "A garantia legal, que já está prevista em lei independente de contrato, e a garantia contratual, dada pelo próprio fornecedor por meio do termo de garantia."
   },
   {
-    "question": "Quanto tempo dura o período de experiência de um colaborador CLT na Vetor Analytics?",
-    "expected_chunk_id": "9cc813b0-ea10-438d-b006-a76baab93e78"
+    "question": "Qual o limite máximo da multa por falta de pagamento em uma compra parcelada, segundo o Código de Defesa do Consumidor?",
+    "expected_chunk_id": "65fc840a-f6cc-4834-949d-d60d116bc777",
+    "reference_answer": "A multa por falta de pagamento não pode ser maior do que 2% do valor da prestação."
   },
   {
-    "question": "Qual o valor do vale-refeição oferecido pela Vetor Analytics?",
-    "expected_chunk_id": "e57cdf2b-47f9-4713-b42a-a3fc1aa14590"
+    "question": "O que é considerado 'venda casada' pelo Código de Defesa do Consumidor?",
+    "expected_chunk_id": ["892119ef-e3e6-4298-a837-aad66bf85110", "984a6231-8442-456a-8a7d-d8144dd85a07"],
+    "reference_answer": "Venda casada é condicionar a venda de um produto à compra de outro produto (por exemplo, exigir a compra de leite para levar o pão). É proibida por lei e considerada crime (Lei nº 8.137/90, art. 5º, II)."
   },
   {
-    "question": "Quantos dias por semana o colaborador precisa ir ao escritório no modelo híbrido da Vetor Analytics?",
-    "expected_chunk_id": "46ee3356-a73f-47dc-839a-82cea7c5f78e"
+    "question": "Quantos dias o consumidor tem para exercer o direito de arrependimento em compras feitas por telefone ou reembolso postal?",
+    "expected_chunk_id": "7299878b-d294-41c5-bb68-d5026e862496",
+    "reference_answer": "7 dias, contados a partir da assinatura do contrato ou do recebimento do produto ou serviço."
   },
   {
-    "question": "Qual o prazo máximo para concluir os treinamentos obrigatórios de segurança da informação?",
-    "expected_chunk_id": "dd07bd6f-b700-4adc-bd23-3821bc83ceb0"
+    "question": "Após quantos anos as informações negativas devem ser retiradas do cadastro de consumidores?",
+    "expected_chunk_id": "7299878b-d294-41c5-bb68-d5026e862496",
+    "reference_answer": "Após 5 anos."
   },
   {
-    "question": "Com quantos dias de antecedência as férias devem ser solicitadas na Vetor Analytics?",
-    "expected_chunk_id": "b8c46ebb-f6dd-495d-8fc9-a8f53dfc7773"
+    "question": "Qual o prazo do consumidor para reclamar caso um objeto desapareça durante uma mudança, segundo a cartilha?",
+    "expected_chunk_id": "7eb6df39-6352-44dc-be29-df38f8218961",
+    "reference_answer": "O prazo para reclamar é de 90 dias."
   },
   {
-    "question": "Qual o e-mail de contato do RH da Vetor Analytics para dúvidas sobre benefícios?",
-    "expected_chunk_id": "0ebfbf2a-b5cb-42f5-b891-2d236e94ad9e"
+    "question": "O fornecedor pode usar peças usadas no conserto de um produto sem autorização do consumidor?",
+    "expected_chunk_id": "09ea0981-a311-4fb0-bc6e-807c64007f98",
+    "reference_answer": "Não. O fornecedor só pode usar peças usadas no conserto se o consumidor concordar. Repor peças usadas sem autorização é considerado crime pelo CDC (art. 70)."
   },
   {
-    "question": "Quantos dias o cliente tem para solicitar reembolso após receber o produto na NordTech?",
-    "expected_chunk_id": "2b219aa9-e4ac-43fa-8c1f-045cb47264be"
+    "question": "Qual o prazo de garantia para móveis entregues com problema de cupim, segundo a cartilha do consumidor?",
+    "expected_chunk_id": "e221fb38-36ec-4b46-bf06-2858a603dd6b",
+    "reference_answer": "O prazo é de 90 dias, exceto em caso de vício oculto. O consumidor deve exigir a substituição imediata ou o dinheiro de volta."
   },
   {
-    "question": "Produtos com lacre de segurança rompido podem ser devolvidos por arrependimento?",
-    "expected_chunk_id": "91ecfc7b-b3e6-42c3-b79d-ecb7fcb33a4e"
+    "question": "Por quanto tempo o consumidor deve guardar a nota fiscal e os documentos de um serviço contratado?",
+    "expected_chunk_id": "7932d9c1-9fb6-492a-be21-c8f5a4d6a092",
+    "reference_answer": "Por, no mínimo, dois anos ou pelo prazo de garantia firmado no contrato."
   },
   {
-    "question": "Em quanto tempo o reembolso é processado após a NordTech confirmar o recebimento do produto devolvido?",
-    "expected_chunk_id": "8fe66cc5-228d-4261-ae55-4bc6eec17716"
+    "question": "O que é um Fundo de Investimento Imobiliário (FII) segundo o Guia CVM do Investidor?",
+    "expected_chunk_id": "f5031610-3685-4fde-be7d-4d82fdc41837",
+    "reference_answer": "É uma comunhão de recursos, captados por meio do sistema de distribuição de valores mobiliários, destinada à aplicação em empreendimentos imobiliários, como construção e aquisição de imóveis para posterior locação ou arrendamento."
   },
   {
-    "question": "Qual o prazo de garantia legal para produtos duráveis com defeito de fabricação na NordTech?",
-    "expected_chunk_id": "92eaf666-9d8d-434b-9a5f-859b7aa76f2c"
+    "question": "Qual lei criou os Fundos de Investimento Imobiliário (FII) no Brasil?",
+    "expected_chunk_id": "f5031610-3685-4fde-be7d-4d82fdc41837",
+    "reference_answer": "A Lei nº 8.668/93, regulamentada pela Instrução CVM nº 472/08."
   },
   {
-    "question": "Quem paga o frete de devolução em caso de defeito de fabricação na NordTech?",
-    "expected_chunk_id": "2d19e8ff-66f7-4982-87ae-f770fc60c5cc"
+    "question": "Como um cotista de FII pode se desfazer do seu investimento, já que as cotas não podem ser resgatadas?",
+    "expected_chunk_id": "f842487f-238b-446a-86b9-c5acc06d5f37",
+    "reference_answer": "A única forma é vender as cotas para outro investidor no mercado secundário (bolsa de valores ou balcão organizado), de forma semelhante à venda de ações."
   },
   {
-    "question": "Quanto tempo demora pra ficar pronto o serviço combinado com a TechConsult?",
-    "expected_chunk_id": "06dde965-f58a-42db-8860-63165a07a21f"
+    "question": "Quem pode convocar uma assembleia geral de cotistas de um FII?",
+    "expected_chunk_id": "e1eeb595-bef0-4cc9-817b-f46c98797a96",
+    "reference_answer": "O administrador do FII, cotistas que detenham no mínimo 5% das cotas emitidas, ou o representante dos cotistas."
   },
   {
-    "question": "Quanto custa pra CONTRATANTE desistir do contrato antes do fim sem motivo?",
-    "expected_chunk_id": "45e71bf3-e9be-48fc-8fb6-e0b003f0a83b"
+    "question": "Qual o principal documento que o investidor deve consultar antes de aplicar recursos em uma oferta pública de cotas de FII?",
+    "expected_chunk_id": "72142738-9f65-4b6f-a17b-9f6f4d1f78c3",
+    "reference_answer": "O Prospecto, documento com as informações necessárias para o investidor tomar sua decisão de investimento, incluindo política de investimentos, descrição dos imóveis e fatores de risco."
   },
   {
-    "question": "A Vetor Analytics paga 13º salário aos colaboradores?",
+    "question": "Por que a liquidez das cotas de um FII é considerada reduzida, segundo o Guia CVM?",
+    "expected_chunk_id": "68db0267-2c3c-46ae-8059-c93cedacbffb",
+    "reference_answer": "Porque os FII são constituídos sob a forma de condomínios fechados, sem possibilidade de resgate de cotas, o que pode dificultar a venda das cotas pelos titulares no mercado secundário."
+  },
+  {
+    "question": "O Fundo Garantidor de Créditos (FGC) garante o investimento em cotas de FII?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Existe cláusula de não-concorrência no contrato de prestação de serviços da TechConsult?",
+    "question": "Qual a taxa de juros cobrada hoje no cheque especial para pessoas físicas no Brasil?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Qual o horário de almoço dos colaboradores da Vetor Analytics?",
+    "question": "Qual o valor mínimo de investimento inicial exigido para comprar cotas de um FII?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "A NordTech oferece desconto para pagamento à vista?",
+    "question": "O Código de Defesa do Consumidor permite o cancelamento de plano de saúde sem multa a qualquer momento?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Qual o valor da multa por atraso na entrega da segunda parcela de pagamento?",
+    "question": "Qual o número de telefone do SAC (0800) do Banco Central para reclamações de consumidores?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "O contrato prevê reajuste anual de valores por inflação?",
+    "question": "Qual o valor mínimo em reais exigido para se tornar cotista de um Fundo de Investimento Imobiliário?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Quantas revisões gratuitas de escopo o cliente tem direito antes da entrega final?",
+    "question": "O glossário do Banco Central define qual é a alíquota do Imposto de Renda sobre operações de crédito?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Qual o valor do auxílio-creche oferecido pela Vetor Analytics?",
+    "question": "É permitido comprar um imóvel financiado usando cotas de FII como garantia, segundo o guia da CVM?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "A Vetor Analytics oferece day off de aniversário aos colaboradores?",
+    "question": "Qual o prazo de carência para acionar o seguro-desemprego, segundo a cartilha do consumidor?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "Depois de quantos ciclos de avaliação de desempenho o colaborador pode pedir promoção?",
+    "question": "Bancos digitais estão sujeitos às mesmas regras do glossário de crédito do Banco Central que bancos tradicionais?",
     "expected_chunk_id": null,
     "out_of_scope": true
   },
   {
-    "question": "A NordTech aceita troca de produto por outro modelo, sem ser por defeito?",
-    "expected_chunk_id": null,
-    "out_of_scope": true
-  },
-  {
-    "question": "Qual o prazo de garantia para produtos não duráveis na NordTech?",
+    "question": "Qual o percentual máximo de administração que um FII pode cobrar dos cotistas por lei?",
     "expected_chunk_id": null,
     "out_of_scope": true
   }

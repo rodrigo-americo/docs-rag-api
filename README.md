@@ -164,17 +164,19 @@ O branch de rewrite dispara quando nenhum chunk retornado ultrapassa o threshold
 
 ## Avaliação
 
-Medido sobre um dataset de 34 perguntas (22 respondíveis + 12 fora de
-escopo, propositalmente adversariais) contra 3 documentos sintéticos:
+Medido sobre um dataset de 34 perguntas (23 respondíveis + 11 fora de
+escopo) contra 3 documentos reais de finanças e direito (Glossário de
+Crédito do Banco Central, Guia CVM de Fundos Imobiliários, Cartilha do
+Consumidor do Ministério da Justiça):
 
 | Métrica | Resultado |
 |---------|-----------|
-| Recall@5 (perguntas respondíveis) | 100% (22/22) |
-| Recusa correta (fora de escopo) | 100% (12/12) |
-| Faithfulness | 0.98 (21 respostas não-recusa) |
-| Latência p50 | 1.65s |
-| Latência p95 | 4.51s |
-| Custo médio / query | US$ 0.00010 |
+| Recall@5 (perguntas respondíveis) | 96% (22/23) |
+| Recusa correta (fora de escopo) | 100% (11/11) |
+| Faithfulness | 1.00 (21 respostas não-recusa) |
+| Latência p50 | 3.36s |
+| Latência p95 | 10.92s |
+| Custo médio / query | US$ 0.00046 |
 
 Detalhes do dataset, como cada métrica é calculada, o viés do juiz de
 Faithfulness (medido empiricamente, não só citado como limitação) e a

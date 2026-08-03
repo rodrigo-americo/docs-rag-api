@@ -23,10 +23,12 @@ mudança.
 Decisões já confirmadas com o usuário:
 - **UMAP + GMM completo**, fiel ao paper (não um k-means simplificado) —
   novas dependências `umap-learn` e `scikit-learn`.
-- **Adicionar um documento maior e realista** ao dataset de avaliação —
-  os 3 documentos sintéticos atuais são curtos demais pra formar clusters
-  com sinal real; a feature só prova seu valor contra um documento com
-  volume de chunks e temas genuinamente espalhados.
+- ~~Adicionar um documento maior e realista ao dataset de avaliação~~ —
+  **feito**: os 3 documentos sintéticos foram substituídos por documentos
+  reais (Glossário de Crédito do BCB, Guia CVM de FII, Cartilha do
+  Consumidor do MJ — ver [avaliação](../avaliacao.md)). A Cartilha sozinha
+  gera 78 chunks com `chunk_size=700`, volume e dispersão de temas
+  suficientes para RAPTOR formar clusters com sinal real.
 - **Retrieval "collapsed tree"** — todos os níveis competem juntos num
   único ranking, sem navegação nível-a-nível.
 - **Clustering many-to-many de verdade**: GMM faz soft clustering (um

@@ -2,34 +2,49 @@
 
 [← Voltar ao README](../README.md)
 
-Dataset: 34 perguntas sobre 3 documentos sintéticos (contrato de serviço,
-política de reembolso, manual de onboarding) com `expected_chunk_id`.
-22 perguntas têm resposta nos documentos (algumas com vocabulário
-propositalmente distante do texto original, para forçar o branch de
-rewrite do grafo); 12 são propositalmente fora de escopo — cobrindo três
-variações: tópicos plausíveis nunca mencionados, perguntas que usam
-vocabulário/entidades reais dos documentos mas pedem um dado que não
-existe (mais difíceis de recusar corretamente que um tópico totalmente
-alheio), e casos de fronteira que exploram os limites exatos de uma
-definição do texto (ex: garantia vale só para "produtos duráveis" —
-pergunta sobre produtos não-duráveis). Amostra ampliada de 4 para 12
-casos negativos porque 100% sobre 4 exemplos tem intervalo de confiança
-grande demais pra ser uma alegação séria — 12 casos, incluindo os mais
-difíceis de cada variação, é uma prova mais forte do mecanismo de recusa.
+Dataset: 34 perguntas sobre 3 documentos reais e vigentes, de finanças e
+direito (Glossário de Estatísticas Monetárias e de Crédito do Banco
+Central, Guia CVM do Investidor sobre Fundos de Investimento Imobiliário,
+e Cartilha do Consumidor do Ministério da Justiça) com `expected_chunk_id`.
+23 perguntas têm resposta nos documentos; 11 são propositalmente fora de
+escopo — tópicos plausíveis no mesmo domínio, mas nunca mencionados nos
+três documentos. Uma pergunta (`venda casada`) tem `expected_chunk_id`
+como lista — o CDC repete a mesma definição em duas seções do texto
+("Práticas abusivas" e "Venda casada"), e qualquer um dos dois chunks
+conta como acerto de recall.
+
+> **Nota:** as seções abaixo (calibração de `retrieval_quality_threshold`,
+> teste de viés do juiz de Faithfulness, e o padrão de confusão do LLM em
+> perguntas de resposta negativa) foram medidas contra os 3 documentos
+> sintéticos anteriores (contrato de serviço, política de reembolso,
+> manual de onboarding), substituídos pelos 3 documentos reais acima. As
+> conclusões qualitativas provavelmente continuam válidas, mas os números
+> específicos (tabelas de sweep, scores de Faithfulness por caso) não
+> foram re-medidos contra o dataset novo.
 
 | Métrica | Resultado |
 |---------|-----------|
-| Recall@5 (perguntas respondíveis) | 100% (22/22) |
+| Recall@5 (perguntas respondíveis) | 96% (22/23) |
 | Rewrite disparado | 11/34 perguntas |
-| Recusa correta (fora de escopo) | 100% (12/12) |
-| Faithfulness | 0.98 (21 respostas não-recusa) |
-| Latência p50 | 1.65s |
-| Latência p95 | 4.51s |
-| Custo médio / query | US$ 0.00010 |
+| Recusa correta (fora de escopo) | 100% (11/11) |
+| Faithfulness | 1.00 (21 respostas não-recusa) |
+| Latência p50 | 3.36s |
+| Latência p95 | 10.92s |
+| Custo médio / query | US$ 0.00046 |
 
-Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=150` tokens
-(reduzido só para a avaliação — os documentos sintéticos são curtos demais
-para gerar múltiplos chunks com o `chunk_size=700` padrão). Faithfulness
+A única falha de recall (1/23) é a pergunta sobre CRI/CRA (siglas exatas)
+no glossário do BCB: mesmo após 2 rewrites, o retrieval denso nunca traz
+o chunk certo — os 5 chunks recuperados são todos sobre outras
+modalidades de crédito, vizinhos temáticos que erram o termo exato. A
+resposta do sistema ("não encontrei") é correta dado o contexto que
+recebeu — a falha é de retrieval, não de geração. Ver
+[roadmap](roadmap.md) para como isso motiva a linha "Hybrid" da tabela de
+ablation.
+
+Medido com `gpt-4o-mini` + `text-embedding-3-small`, `chunk_size=700`
+(padrão — diferente da rodada anterior, que usava `chunk_size=150` porque
+os documentos sintéticos eram curtos demais para gerar múltiplos chunks
+no tamanho padrão; os documentos reais não têm essa limitação). Faithfulness
 avaliada por um segundo LLM-juiz, dado o contexto recuperado e a resposta
 gerada, e calculada apenas sobre respostas que tentaram afirmar algo com
 base no contexto — uma recusa correta ("não sei") não é falta de fidelidade,
@@ -158,6 +173,52 @@ Requer `EMBEDDING_PROVIDER=openai` e `CHAT_PROVIDER=openai` no `.env`,
 com uma `OPENAI_API_KEY` real:
 
 ```bash
-CHUNK_SIZE=150 uv run python -m evals.setup_dataset   # ingere os documentos uma vez
-CHUNK_SIZE=150 uv run python -m evals.run_eval
+uv run python -m evals.setup_dataset   # ingere os documentos uma vez
+uv run python -m evals.run_eval
 ```
+
+## RAGAS — bloqueado por incompatibilidade de dependências
+
+Avaliado adicionar [RAGAS](https://docs.ragas.io/) para métricas
+padronizadas e comparáveis com outros projetos (Faithfulness, Context
+Recall, Context Precision, Response Relevancy). `evals/dataset.json` já
+tem `reference_answer` em texto para as 23 perguntas respondíveis —
+pré-requisito para Context Recall/Precision, que julgam contra uma
+resposta de referência, não só o `expected_chunk_id` exato usado no
+Recall@5 atual.
+
+A integração em si está bloqueada: toda versão de `ragas` publicada até
+agora (testado `0.4.3` e `0.2.15`) importa `ChatVertexAI` de
+`langchain_community.chat_models.vertexai` incondicionalmente
+(`ragas/llms/base.py`), um caminho removido em `langchain-community>=0.4`
+— a versão puxada por `langchain>=1.3`, que este projeto usa. Testado
+manualmente (não só verificado em changelog):
+
+- **Mesmo venv, downgrade da família langchain para 0.3.x**: resolve o
+  import do `ragas`, mas força `langchain`/`langchain-core`/
+  `langchain-openai` de volta para 0.3.x — incompatível com o resto do
+  código do projeto, que depende de `langchain>=1.3,<2.0`.
+- **Venv isolado, mas importando `app.core.config` no mesmo processo**:
+  ainda colide, porque `uv sync`/`uv pip install -e .` traz
+  `[project.dependencies]` (LangChain 1.x) para dentro da mesma
+  resolução, mesmo em grupo `[dependency-groups]` separado — `uv` trata
+  grupos como aditivos ao pacote raiz, não como ambientes independentes.
+- **Venv isolado, instalando dependências do app uma a uma com
+  `--no-deps`** (contornando o pacote raiz): funciona até o próximo
+  import cruzado — `langchain-core` mais recente sem pin explícito quebra
+  o `ragas`, e alinhar isso arrasta `pydantic`/`pydantic-core` para uma
+  combinação que quebra de novo. Cadeia de reação, não resolvível só com
+  flags de instalação.
+
+**Caminho viável, não implementado ainda**: separar em dois processos
+com um arquivo intermediário — 1) `run_eval.py` (venv normal do projeto)
+exporta `question`/`answer`/`retrieved_contexts` para JSON; 2) um script
+`ragas_eval.py` roda num venv **sem o pacote `app` instalado** (só
+`ragas` + `langchain-openai<0.4`, sem `langchain>=1.3`), lê esse JSON e
+chama `ragas.evaluate()`. Não dá para o script RAGAS importar
+`app.core.config` ou `evals.run_eval` diretamente — os dois processos não
+podem compartilhar interpretador. Não implementado por decisão explícita
+(mais fricção operacional do que o valor imediato justificava); fica
+registrado aqui para retomar se `ragas` corrigir o import incondicional
+upstream ou se o projeto migrar para uma versão do RAGAS compatível com
+LangChain 1.x.
