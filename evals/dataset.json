@@ -1,117 +1,120 @@
 [
   {
     "question": "Como é calculada a relação Crédito/PIB segundo o glossário do Banco Central?",
-    "expected_chunk_id": "2f2821a2-4196-4161-a260-1e45552eccf6",
+    "expected_chunk_id": "7c44b3d7-6962-4a63-b40c-57feb37d76fc",
     "reference_answer": "É a relação do saldo das operações de crédito dividido pelo valor do PIB acumulado nos últimos doze meses em valores correntes."
   },
   {
     "question": "O que é considerado inadimplência da carteira de crédito, segundo o BCB?",
-    "expected_chunk_id": "2f2821a2-4196-4161-a260-1e45552eccf6",
+    "expected_chunk_id": "7c44b3d7-6962-4a63-b40c-57feb37d76fc",
     "reference_answer": "É o somatório do saldo das operações de crédito com atraso acima de 90 dias e não baixado para prejuízo, dividido pelo saldo total de crédito da carteira."
   },
   {
     "question": "Qual o critério de faturamento anual que classifica uma empresa como Micro, Pequena ou Média Empresa (MPME)?",
-    "expected_chunk_id": "b75ba3f8-a6d8-4624-a0fa-9e95cbced59b",
+    "expected_chunk_id": "688298f0-a966-4a2c-9102-14e14f49c349",
     "reference_answer": "MPME é a empresa com receita bruta anual até R$300 milhões ou ativo total até R$240 milhões."
   },
   {
     "question": "O que é o spread médio na definição do glossário de crédito do Banco Central?",
-    "expected_chunk_id": "b75ba3f8-a6d8-4624-a0fa-9e95cbced59b",
+    "expected_chunk_id": "688298f0-a966-4a2c-9102-14e14f49c349",
     "reference_answer": "É a diferença entre a taxa média de juros e o custo de captação estimado para cada modalidade."
   },
   {
     "question": "Qual a diferença entre cartão de crédito parcelado e cartão de crédito rotativo, segundo o glossário do BCB?",
-    "expected_chunk_id": "cbe88200-64cc-4e67-a311-62ff97c203d5",
+    "expected_chunk_id": "6d8f56bb-809c-43e0-9528-d8eebcbc5685",
     "reference_answer": "Cartão de crédito parcelado é o parcelamento das compras ou da fatura mediante cobrança de juros. Cartão de crédito rotativo é o financiamento do saldo devedor remanescente após o pagamento parcial da fatura."
   },
   {
     "question": "O que caracteriza a modalidade de crédito 'Vendor' segundo o glossário do Banco Central?",
-    "expected_chunk_id": "8443ef25-42a2-41f5-9be6-f4ec90ccca36",
+    "expected_chunk_id": "e7380785-dd92-4add-8cc0-2d5718464d68",
     "reference_answer": "Vendor é o financiamento de vendas baseado na cessão de crédito: a empresa vendedora recebe à vista da instituição financeira, e a empresa compradora assume o compromisso de pagar a prazo à instituição financeira, que fica com os direitos creditórios e o risco da operação."
   },
   {
     "question": "O que são Certificados de Recebíveis Imobiliários (CRI) e Certificados de Recebíveis do Agronegócio (CRA) segundo o glossário do BCB?",
-    "expected_chunk_id": "02107962-e387-46ac-9869-30db8f4460c5",
+    "expected_chunk_id": "f50db042-8338-4b63-be6e-deae88cb0ff9",
     "reference_answer": "São instrumentos de securitização emitidos por companhias securitizadoras, lastreados em operações de crédito do SFN ou geradas fora do sistema financeiro."
   },
   {
     "question": "Como é composto o M1 (meios de pagamento de conceito restrito) segundo o glossário do Banco Central?",
-    "expected_chunk_id": "f6b504df-f3f7-4246-9b11-7bf8fbfc6405",
+    "expected_chunk_id": "44f0bdb6-a928-4c1a-8759-30dab89d544e",
     "reference_answer": "O M1 é composto pelo papel-moeda em poder do público mais os depósitos à vista."
   },
   {
     "question": "Quais são os dois tipos de garantia previstos no Código de Defesa do Consumidor?",
-    "expected_chunk_id": "65fc840a-f6cc-4834-949d-d60d116bc777",
+    "expected_chunk_id": "207be301-ac64-4596-91d4-e18ab69da85f",
     "reference_answer": "A garantia legal, que já está prevista em lei independente de contrato, e a garantia contratual, dada pelo próprio fornecedor por meio do termo de garantia."
   },
   {
     "question": "Qual o limite máximo da multa por falta de pagamento em uma compra parcelada, segundo o Código de Defesa do Consumidor?",
-    "expected_chunk_id": "65fc840a-f6cc-4834-949d-d60d116bc777",
+    "expected_chunk_id": "207be301-ac64-4596-91d4-e18ab69da85f",
     "reference_answer": "A multa por falta de pagamento não pode ser maior do que 2% do valor da prestação."
   },
   {
     "question": "O que é considerado 'venda casada' pelo Código de Defesa do Consumidor?",
-    "expected_chunk_id": ["892119ef-e3e6-4298-a837-aad66bf85110", "984a6231-8442-456a-8a7d-d8144dd85a07"],
+    "expected_chunk_id": [
+      "f670a453-0e61-4726-855d-b088419726e5",
+      "53984e0f-165e-4c78-b50d-9903c3af33be"
+    ],
     "reference_answer": "Venda casada é condicionar a venda de um produto à compra de outro produto (por exemplo, exigir a compra de leite para levar o pão). É proibida por lei e considerada crime (Lei nº 8.137/90, art. 5º, II)."
   },
   {
     "question": "Quantos dias o consumidor tem para exercer o direito de arrependimento em compras feitas por telefone ou reembolso postal?",
-    "expected_chunk_id": "7299878b-d294-41c5-bb68-d5026e862496",
+    "expected_chunk_id": "20e7ca01-13de-4a80-8cf6-256c98706f9e",
     "reference_answer": "7 dias, contados a partir da assinatura do contrato ou do recebimento do produto ou serviço."
   },
   {
     "question": "Após quantos anos as informações negativas devem ser retiradas do cadastro de consumidores?",
-    "expected_chunk_id": "7299878b-d294-41c5-bb68-d5026e862496",
+    "expected_chunk_id": "20e7ca01-13de-4a80-8cf6-256c98706f9e",
     "reference_answer": "Após 5 anos."
   },
   {
     "question": "Qual o prazo do consumidor para reclamar caso um objeto desapareça durante uma mudança, segundo a cartilha?",
-    "expected_chunk_id": "7eb6df39-6352-44dc-be29-df38f8218961",
+    "expected_chunk_id": "7f8e0a75-81af-4ff0-8145-1a1f252b0cde",
     "reference_answer": "O prazo para reclamar é de 90 dias."
   },
   {
     "question": "O fornecedor pode usar peças usadas no conserto de um produto sem autorização do consumidor?",
-    "expected_chunk_id": "09ea0981-a311-4fb0-bc6e-807c64007f98",
+    "expected_chunk_id": "cf89adbe-202f-4a67-9f86-061427dce8f3",
     "reference_answer": "Não. O fornecedor só pode usar peças usadas no conserto se o consumidor concordar. Repor peças usadas sem autorização é considerado crime pelo CDC (art. 70)."
   },
   {
     "question": "Qual o prazo de garantia para móveis entregues com problema de cupim, segundo a cartilha do consumidor?",
-    "expected_chunk_id": "e221fb38-36ec-4b46-bf06-2858a603dd6b",
+    "expected_chunk_id": "4045de46-261c-4720-b2f0-431c406f04cc",
     "reference_answer": "O prazo é de 90 dias, exceto em caso de vício oculto. O consumidor deve exigir a substituição imediata ou o dinheiro de volta."
   },
   {
     "question": "Por quanto tempo o consumidor deve guardar a nota fiscal e os documentos de um serviço contratado?",
-    "expected_chunk_id": "7932d9c1-9fb6-492a-be21-c8f5a4d6a092",
+    "expected_chunk_id": "e3fcd16e-c116-4ac0-8d24-caf9bed0407b",
     "reference_answer": "Por, no mínimo, dois anos ou pelo prazo de garantia firmado no contrato."
   },
   {
     "question": "O que é um Fundo de Investimento Imobiliário (FII) segundo o Guia CVM do Investidor?",
-    "expected_chunk_id": "f5031610-3685-4fde-be7d-4d82fdc41837",
+    "expected_chunk_id": "912a0e41-1570-45b5-9fba-72d72507f8e3",
     "reference_answer": "É uma comunhão de recursos, captados por meio do sistema de distribuição de valores mobiliários, destinada à aplicação em empreendimentos imobiliários, como construção e aquisição de imóveis para posterior locação ou arrendamento."
   },
   {
     "question": "Qual lei criou os Fundos de Investimento Imobiliário (FII) no Brasil?",
-    "expected_chunk_id": "f5031610-3685-4fde-be7d-4d82fdc41837",
+    "expected_chunk_id": "912a0e41-1570-45b5-9fba-72d72507f8e3",
     "reference_answer": "A Lei nº 8.668/93, regulamentada pela Instrução CVM nº 472/08."
   },
   {
     "question": "Como um cotista de FII pode se desfazer do seu investimento, já que as cotas não podem ser resgatadas?",
-    "expected_chunk_id": "f842487f-238b-446a-86b9-c5acc06d5f37",
+    "expected_chunk_id": "2365f74c-c8fa-48af-9d89-42c99fa487c7",
     "reference_answer": "A única forma é vender as cotas para outro investidor no mercado secundário (bolsa de valores ou balcão organizado), de forma semelhante à venda de ações."
   },
   {
     "question": "Quem pode convocar uma assembleia geral de cotistas de um FII?",
-    "expected_chunk_id": "e1eeb595-bef0-4cc9-817b-f46c98797a96",
+    "expected_chunk_id": "0f82e1ea-8f9a-4574-bdc1-f9568ee40ab4",
     "reference_answer": "O administrador do FII, cotistas que detenham no mínimo 5% das cotas emitidas, ou o representante dos cotistas."
   },
   {
     "question": "Qual o principal documento que o investidor deve consultar antes de aplicar recursos em uma oferta pública de cotas de FII?",
-    "expected_chunk_id": "72142738-9f65-4b6f-a17b-9f6f4d1f78c3",
+    "expected_chunk_id": "3a562deb-b8db-4146-b1d7-ca8843c7edeb",
     "reference_answer": "O Prospecto, documento com as informações necessárias para o investidor tomar sua decisão de investimento, incluindo política de investimentos, descrição dos imóveis e fatores de risco."
   },
   {
     "question": "Por que a liquidez das cotas de um FII é considerada reduzida, segundo o Guia CVM?",
-    "expected_chunk_id": "68db0267-2c3c-46ae-8059-c93cedacbffb",
+    "expected_chunk_id": "2365f74c-c8fa-48af-9d89-42c99fa487c7",
     "reference_answer": "Porque os FII são constituídos sob a forma de condomínios fechados, sem possibilidade de resgate de cotas, o que pode dificultar a venda das cotas pelos titulares no mercado secundário."
   },
   {
