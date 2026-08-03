@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request
+from langsmith import trace
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,7 +57,13 @@ async def query(
         embedding_provider=embedding_provider,
         chat_provider=chat_provider,
     )
-    final_state = await compiled_graph.ainvoke(initial_state)
+    trace_id = None
+    if settings.langsmith_tracing:
+        with trace(name="query", project_name=settings.langsmith_project) as run_tree:
+            final_state = await compiled_graph.ainvoke(initial_state)
+        trace_id = str(run_tree.id)
+    else:
+        final_state = await compiled_graph.ainvoke(initial_state)
 
     if final_state["retry_count"] >= settings.max_rewrite_attempts:
         # Sinal de segurança, não de erro: uma pergunta difícil bate o
@@ -87,4 +94,5 @@ async def query(
         answer=strip_html(final_state["answer"]),
         answerable=final_state["answerable"],
         citations=[Citation.from_chunk(chunk) for chunk in final_state["citations"]],
+        trace_id=trace_id,
     )

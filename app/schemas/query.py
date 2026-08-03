@@ -40,5 +40,7 @@ class QueryResponse(BaseModel):
     )
     citations: list[Citation] = Field(..., description="Chunks usados como fonte da resposta")
     trace_id: str | None = Field(
-        None, description="ID do trace no LangSmith — ainda não implementado"
+        None, description="ID da trace raiz no LangSmith (execução completa do grafo "
+        "por pergunta) — None quando langsmith_tracing está desligado"
     )
+

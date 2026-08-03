@@ -9,10 +9,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.documents import get_embedding as get_embedding_for_ingest
 from app.api.documents import get_session_factory
+from app.api.query import get_chat, get_embedding
 from app.core.config import settings
 from app.core.db import get_db_session
 from app.main import app
+from app.services.chat import FakeChatProvider
+from app.services.embedding import FakeEmbeddingProvider
 
 # NullPool: sem conexões persistentes entre requests. Cada operação abre e
 # fecha sua própria conexão dentro do event loop atual — evita o clássico
@@ -43,6 +47,17 @@ app.dependency_overrides[get_session_factory] = lambda: _TestSessionLocal
 # (get_remote_address), então o rate limit por IP derrubaria a suite se
 # ficasse ligado aqui — desliga só no processo de teste.
 app.state.limiter.enabled = False
+
+# Sempre fake em teste, independente do que estiver no .env local
+# (CHAT_PROVIDER=openai/EMBEDDING_PROVIDER=openai) — evita custo real de
+# OpenAI e conexões de rede penduradas a cada rodada da suite. Testes que
+# precisarem do provider real de verdade (ex: contrato de resposta da API)
+# fazem override pontual com uma fixture própria.
+# get_embedding é declarado separadamente em app.api.query e app.api.documents
+# (um Depends por router) — os dois precisam de override, não são a mesma função.
+app.dependency_overrides[get_chat] = lambda: FakeChatProvider()
+app.dependency_overrides[get_embedding] = lambda: FakeEmbeddingProvider()
+app.dependency_overrides[get_embedding_for_ingest] = lambda: FakeEmbeddingProvider()
 
 
 @pytest_asyncio.fixture(autouse=True)

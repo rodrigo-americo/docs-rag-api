@@ -13,12 +13,14 @@ from app.core.db import engine
 from app.core.logging import configure_logging, get_logger
 from app.core.queue import get_redis_client
 from app.core.rate_limit import limiter
+from app.core.tracing import configure_tracing
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup: configura logging ANTES de qualquer outra coisa.
     configure_logging()
+    configure_tracing()
     log = get_logger(__name__)
     log.info(
         "app.startup",

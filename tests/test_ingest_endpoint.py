@@ -26,6 +26,7 @@ async def test_ingest_marks_document_as_failed_when_embedding_provider_fails(
     # Embedding acontece na Fase B (process_document, em background) — a
     # falha não é mais visível como erro HTTP síncrono (503), só depois,
     # via status=failed. O Document em si é criado normalmente na Fase A.
+    previous_override = app.dependency_overrides[get_embedding]
     app.dependency_overrides[get_embedding] = lambda: _FailingEmbeddingProvider()
     try:
         response = await client.post(
@@ -33,7 +34,7 @@ async def test_ingest_marks_document_as_failed_when_embedding_provider_fails(
             files={"file": ("contrato.txt", sample_txt_bytes, "text/plain")},
         )
     finally:
-        del app.dependency_overrides[get_embedding]
+        app.dependency_overrides[get_embedding] = previous_override
 
     assert response.status_code == 202
 
