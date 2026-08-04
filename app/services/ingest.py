@@ -1,4 +1,5 @@
 import hashlib
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from app.core.exceptions import (
     SuspiciousContentError,
 )
 from app.core.logging import get_logger
+from app.core.metrics import ingest_processed_total, ingest_processing_seconds
 from app.core.storage import delete_upload, read_upload, save_upload
 from app.models.document import Chunk, Document, DocumentStatus
 from app.services.chunking import TextChunk, chunk_text
@@ -141,8 +143,14 @@ class IngestService:
         o que fazer com a mensagem da fila (ack vs retry) sem precisar
         reconsultar o banco. None só no caso raro do Document não existir
         mais (ver abaixo).
+
+        Mede ingest_processing_seconds e incrementa ingest_processed_total
+        (métricas Prometheus, ver app/core/metrics.py) em torno do trabalho
+        pesado (parse+embedding+persist) — não do caso "não encontrado" acima,
+        que nunca chega a processar nada.
         """
         async with self._session_factory() as session:
+            started_at = time.perf_counter()
             try:
                 doc = await session.get(Document, document_id)
                 if doc is None:
@@ -179,6 +187,8 @@ class IngestService:
                 await session.commit()
                 log.info("ingest.process_document_done", document_id=str(document_id))
                 delete_upload(document_id)
+                ingest_processing_seconds.observe(time.perf_counter() - started_at)
+                ingest_processed_total.labels(status=DocumentStatus.INDEXED).inc()
                 return DocumentStatus.INDEXED
             except Exception as exc:
                 await session.rollback()
@@ -188,6 +198,8 @@ class IngestService:
                     error=str(exc),
                 )
                 await self._mark_failed(document_id, str(exc))
+                ingest_processing_seconds.observe(time.perf_counter() - started_at)
+                ingest_processed_total.labels(status=DocumentStatus.FAILED).inc()
                 # NÃO apaga o arquivo aqui: quem chama pode reenfileirar pra
                 # nova tentativa (ver app/worker.py), e o arquivo precisa
                 # continuar disponível pra isso. Só apaga em caso de sucesso

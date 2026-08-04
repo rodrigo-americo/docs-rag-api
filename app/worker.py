@@ -2,10 +2,12 @@ import asyncio
 import uuid
 from collections.abc import Callable
 
+from prometheus_client import start_http_server
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
+from app.core.metrics import registry
 from app.core.queue import ack, dequeue, enqueue, get_redis_client
 from app.core.storage import delete_upload
 from app.models.document import DocumentStatus
@@ -32,6 +34,16 @@ async def run(session_factory: Callable[[], AsyncSession] | None = None) -> None
     """
     configure_logging()
     log.info("worker.startup", queue=settings.ingest_queue_name)
+
+    # process_document() incrementa ingest_processed_total/ingest_processing_seconds
+    # (app/core/metrics.py) dentro deste processo — sem um servidor HTTP aqui,
+    # essas métricas ficariam presas na memória do worker, inacessíveis ao
+    # Prometheus (diferente de ingest_queue_depth, lido pela API direto do
+    # Redis em app/api/health.py). Porta 0 desliga: usada só por
+    # tests/test_worker_integration.py, que sobe múltiplas instâncias de
+    # run() no mesmo processo pytest — todas na mesma porta fixa colidiriam.
+    if settings.worker_metrics_port:
+        start_http_server(settings.worker_metrics_port, registry=registry)
 
     engine = None
     if session_factory is None:

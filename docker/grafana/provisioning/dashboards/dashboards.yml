@@ -1,0 +1,11 @@
+# docker/grafana/provisioning/dashboards/dashboards.yml
+# Aponta o Grafana pra carregar qualquer .json nesta pasta como dashboard —
+# igual ao datasource, evita montar o dashboard na mão pela UI.
+apiVersion: 1
+
+providers:
+  - name: docs-rag-api
+    folder: ""
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards

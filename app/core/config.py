@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     ingest_queue_name: str = "ingest_queue"
     ingest_max_retries: int = 3
 
+    # --- Métricas (worker) ---
+    # process_document() roda no processo do worker (sem servidor HTTP
+    # próprio), não no da API — um /metrics em app/api/health.py não
+    # alcançaria os contadores/histograma incrementados lá. worker_metrics_port
+    # sobe um servidor HTTP só-métricas dedicado, no mesmo processo do
+    # worker (ver app/worker.py). 0 desliga: usado pelo worker de teste
+    # (tests/test_worker_integration.py sobe múltiplas instâncias de run()
+    # no mesmo processo pytest — todas na mesma porta fixa colidiriam).
+    worker_metrics_port: int = 9100
+
     @model_validator(mode="after")
     def _require_redis_url_when_selected(self) -> "Settings":
         if self.queue_backend == "redis" and not self.redis_url:

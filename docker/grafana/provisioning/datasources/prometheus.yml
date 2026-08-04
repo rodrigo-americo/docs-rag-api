@@ -1,0 +1,12 @@
+# docker/grafana/provisioning/datasources/prometheus.yml
+# Provisionamento automático do datasource — evita configurar Prometheus na
+# UI do Grafana manualmente a cada `docker compose down -v`.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

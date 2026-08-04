@@ -102,6 +102,22 @@ curl -X POST http://localhost:8000/query \
 | `DELETE` | `/documents/{id}` | Remove documento e seus chunks |
 | `GET` | `/health` | Liveness — processo vivo |
 | `GET` | `/ready` | Readiness — conexão com Postgres |
+| `GET` | `/metrics` | Métricas Prometheus — fila (profundidade) |
+
+Documentação interativa (gerada automaticamente pelo FastAPI a partir das
+rotas — nenhuma configuração extra) em `http://localhost:8000/docs`
+(Swagger UI) ou `/redoc`.
+
+---
+
+## Observabilidade
+
+Fila, latência de ingest e taxa de falhas num dashboard Grafana já
+provisionado: `docker compose up -d api worker prometheus grafana`, depois
+`http://localhost:3000` (`admin`/`admin`) → **Dashboards → docs-rag-api -
+operacional**. Detalhes (portas, credenciais, por que fila e
+latência/falhas vêm de processos diferentes) em
+[docs/decisoes-tecnicas.md](docs/decisoes-tecnicas.md#observabilidade).
 
 ---
 
@@ -113,7 +129,7 @@ curl -X POST http://localhost:8000/query \
 - **LLM/Embeddings:** OpenAI (`gpt-4o-mini` + `text-embedding-3-small`)
 - **Retrieval:** híbrido — busca densa (pgvector, cosine) + BM25-like (Postgres full-text) fundidos por Reciprocal Rank Fusion
 - **Orquestração RAG:** LangChain + LangGraph
-- **Observabilidade:** LangSmith (tracing) + logging estruturado em JSON
+- **Observabilidade:** LangSmith (tracing de chains) + logging estruturado em JSON + Prometheus/Grafana (métricas operacionais — fila, latência, falhas)
 - **Testes:** pytest + pytest-asyncio + httpx + pytest-recording (VCR)
 - **CI:** GitHub Actions (lint + testes em cada PR, incluindo fila real via Redis)
 - **Rate limiting:** slowapi, por IP, em `/query` e `/documents/ingest`

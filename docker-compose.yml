@@ -96,6 +96,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       QUEUE_BACKEND: redis
       UPLOADS_DIR: /data/uploads
+    ports:
+      # ingest_processed_total e ingest_processing_seconds (ver app/core/metrics.py)
+      # só incrementam dentro do processo do worker (process_document roda
+      # aqui, não na API) — precisa da própria porta HTTP pra o Prometheus
+      # fazer scrape (ver docker/prometheus/prometheus.yml). Exposta no host
+      # só pra inspeção manual; prometheus fala com `worker:9100` na rede
+      # interna do compose.
+      - "9100:9100"
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +115,45 @@ services:
     # Dois serviços rodando "alembic upgrade head" ao mesmo tempo na
     # inicialização é uma corrida desnecessária — só um precisa migrar.
     command: uv run --frozen --no-sync python -m app.worker
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: docs-rag-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Nomeado: séries temporais sobrevivem a `docker compose down` (sem -v).
+      - prometheus_data:/prometheus
+    ports:
+      # Exposto no host só pra inspecionar a UI/API do Prometheus direto
+      # (ex: http://localhost:9090/graph) — grafana fala com `prometheus:9090`
+      # na rede interna do compose, não por esta porta.
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: docs-rag-grafana
+    restart: unless-stopped
+    environment:
+      # Sem isso o Grafana pede pra trocar a senha admin/admin no primeiro
+      # login — aceitável pra um dashboard interno de dev, não pra produção
+      # exposta publicamente.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      # Datasource (Prometheus) e dashboard provisionados automaticamente —
+      # ver docker/grafana/provisioning/. Evita configurar isso na UI toda
+      # vez que o volume nomeado abaixo é recriado.
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
   test:
     build:
@@ -127,6 +174,10 @@ services:
       UPLOADS_DIR: /tmp/docs-rag-uploads-test
       EMBEDDING_PROVIDER: fake
       CHAT_PROVIDER: fake
+      # 0 desliga start_http_server (app/worker.py) — tests/test_worker_integration.py
+      # sobe múltiplas instâncias de run() no mesmo processo pytest; todas na
+      # mesma porta fixa colidiriam ao tentar abrir o socket.
+      WORKER_METRICS_PORT: "0"
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,3 +200,5 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  prometheus_data:
+  grafana_data:

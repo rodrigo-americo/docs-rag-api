@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from typing import Protocol
@@ -52,6 +53,19 @@ async def dequeue(client: redis.Redis, timeout: int = 5) -> tuple[dict, str] | N
     if raw_payload is None:
         return None
     return json.loads(raw_payload), raw_payload
+
+
+async def queue_depths(client: redis.Redis) -> dict[str, int]:
+    """Tamanho atual das duas listas Redis que compõem a fila: "pending"
+    (aguardando um worker) e "processing" (já tirada por um worker via
+    BRPOPLPUSH, ainda sem ack — ver dequeue()). Usado pelo endpoint /metrics
+    para popular o Gauge ingest_queue_depth no momento do scrape.
+    """
+    pending, processing = await asyncio.gather(
+        client.llen(settings.ingest_queue_name),
+        client.llen(settings.ingest_queue_name + _PROCESSING_SUFFIX),
+    )
+    return {"pending": pending, "processing": processing}
 
 
 async def ack(client: redis.Redis, raw_payload: str) -> None:

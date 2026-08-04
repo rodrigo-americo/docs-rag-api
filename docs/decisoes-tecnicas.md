@@ -243,6 +243,52 @@ ficou "mais fiel", mas porque a classificação de "isso é uma recusa" (que
 decide o que entra na amostra julgada por Faithfulness) ficou mais
 precisa.
 
+## Observabilidade
+
+Prometheus + Grafana rodam como serviços do `docker-compose.yml`, com
+datasource e dashboard já provisionados (`docker/prometheus/`,
+`docker/grafana/provisioning/`) — nada pra configurar na UI.
+
+```bash
+docker compose up -d api worker prometheus grafana
+```
+
+| Serviço | URL | Acesso |
+|---------|-----|--------|
+| Grafana (dashboard) | `http://localhost:3000` | `admin` / `admin` |
+| Prometheus (queries/targets) | `http://localhost:9090` | sem login |
+| `/metrics` da API (fila) | `http://localhost:8000/metrics` | — |
+| `/metrics` do worker (latência/falhas) | `http://localhost:9100/metrics` | — |
+
+No Grafana, **Dashboards → docs-rag-api - operacional** traz 3 painéis:
+profundidade da fila, taxa de sucesso/falha (5 min) e latência de ingest
+(p50/p95/p99). Qualquer `POST /documents/ingest` (ver
+[exemplo no README](../README.md#exemplo-de-uso)) é processado pelo worker
+e reflete nos painéis em até ~10s (refresh automático do dashboard).
+
+**Métricas Prometheus em duas portas — API (`/metrics`) e worker (`:9100/metrics`), não uma só**
+`process_document` (a única função que gera latência e sucesso/falha de
+verdade) roda inteiramente dentro do processo `worker`, nunca no da API —
+mesma separação produtor/consumidor já estabelecida no ingest assíncrono
+(ver acima). Um `Counter`/`Histogram` do `prometheus_client` vive em memória
+do processo que o incrementou; colocar `/metrics` só na API, como seria o
+default óbvio, exporia sempre zero para `ingest_processed_total` e
+`ingest_processing_seconds` — os números ficariam presos num processo que
+o Prometheus nunca consulta. `ingest_queue_depth` (`Gauge`) é a exceção que
+confirma a regra: a API consegue reportar isso porque lê o Redis
+diretamente (`LLEN`) no momento do scrape, sem depender de nenhum evento
+observado dentro do próprio processo. A correção foi dar ao worker seu
+próprio servidor HTTP só-métricas (`prometheus_client.start_http_server`,
+`WORKER_METRICS_PORT=9100`, desligável com `0` — usado por
+`tests/test_worker_integration.py`, que sobe múltiplos `run()` no mesmo
+processo pytest e colidiriam numa porta fixa) em vez de um Pushgateway:
+mais simples de operar com um único worker (sem serviço extra no compose,
+sem risco de métrica "congelada" mascarando um worker morto — se o worker
+cai, o scrape falha e aparece `down` no Prometheus, sinal correto). Um
+Pushgateway só compensaria se o plano fosse escalar workers
+horizontalmente (`docker compose up --scale worker=N`), quando um
+`static_config` fixo por hostname deixaria de bastar.
+
 **Log estruturado quando o sistema recusa responder**
 Mesmo raciocínio do log de rewrite: uma recusa isolada é normal (a
 pergunta pode realmente estar fora dos documentos), mas o mesmo IP

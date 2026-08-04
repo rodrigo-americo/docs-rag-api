@@ -1,0 +1,22 @@
+# docker/prometheus/prometheus.yml
+# Scrape config mínimo: só o alvo desta aplicação. Sem service discovery
+# (Consul, Kubernetes etc.) — um único serviço `api` no compose, hostname
+# fixo já resolve via a rede interna do compose.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Fila (Gauge): a API lê o Redis direto no momento do scrape (ver
+  # app/api/health.py::metrics).
+  - job_name: docs-rag-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+
+  # Latência e contagem de sucesso/falha: incrementadas dentro de
+  # process_document, que roda no processo do worker, não da API — ver
+  # app/worker.py::run (start_http_server) e app/services/ingest.py.
+  - job_name: docs-rag-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9100"]
