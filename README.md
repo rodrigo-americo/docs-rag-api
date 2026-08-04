@@ -216,6 +216,9 @@ decisões do projeto:
   cada métrica é calculada, viés do juiz de Faithfulness, e a
   calibração do threshold de retrieval (a tabela principal já está
   na seção Avaliação acima).
+- **[docs/testes.md](docs/testes.md)** — isolamento de custo real de
+  OpenAI (`Fake*Provider` por padrão) e VCR (`pytest-recording`) para
+  cobrir o contrato real de resposta da API sem gastar em toda rodada.
 - **[docs/roadmap.md](docs/roadmap.md)** — próximos passos, organizados
   como ablation study do pipeline de retrieval. Planos detalhados de
   itens maiores (ex: RAPTOR) vivem em `docs/planos/`.

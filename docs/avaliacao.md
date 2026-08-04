@@ -220,6 +220,20 @@ a pergunta). Na prática, isso zera o rewrite no eval (0/34, contra 11/34
 no modo denso) sem custar Recall@5 nem recusa correta — ver tabela
 comparativa no topo deste documento.
 
+## `websearch_to_tsquery` não serve para perguntas longas
+
+`search_bm25_chunks` (`app/rag/retrieval.py`) originalmente usava
+`websearch_to_tsquery` direto — essa função do Postgres une todos os
+termos com AND. Numa pergunta de 11 palavras, nenhum chunk contém todos
+os termos simultaneamente, e a busca BM25 retornava 0 resultados
+(incluindo, ironicamente, para a própria pergunta de CRI/CRA que o modo
+híbrido existe para resolver). A correção foi usar `websearch_to_tsquery`
+só para tokenizar/normalizar (aproveitando o dicionário `portuguese` e o
+tratamento de acentos/plural) e depois reescrever a query trocando `&`
+por `|` (OR entre termos) via `to_tsquery` + `regexp_replace`: um único
+termo específico batendo já produz match, e `ts_rank_cd` continua
+ranqueando mais alto quem bate mais termos.
+
 ## Como rodar a avaliação
 
 Requer `EMBEDDING_PROVIDER=openai` e `CHAT_PROVIDER=openai` no `.env`,
