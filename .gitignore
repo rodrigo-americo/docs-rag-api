@@ -8,7 +8,6 @@ __pycache__/
 .mypy_cache/
 .coverage
 htmlcov/
-tests/cassettes/
 .idea/
 .vscode/
 .claude/

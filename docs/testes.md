@@ -30,13 +30,26 @@ testes usam isso hoje, marcados com `@pytest.mark.vcr`:
   embedding fake de propósito (só o `/query` em si precisa do contrato
   real), mantendo o cassete pequeno.
 
-Os cassetes ficam em `tests/cassettes/` (ignorado no `.gitignore` —
-não versionado). `vcr_config` (fixture `scope="module"` em
+Os cassetes ficam em `tests/cassettes/` e **são versionados** — precisam
+estar no repositório pra CI (checkout limpo, sem cassetes locais) e
+qualquer outro ambiente conseguirem reproduzir esses dois testes sem uma
+`OPENAI_API_KEY` real. `vcr_config` (fixture `scope="module"` em
 `conftest.py`) redige os headers `authorization` e `openai-organization`
-antes de gravar, então a chave real nunca fica no cassete mesmo que ele
-seja versionado por engano. `record_mode="once"`: grava só se o cassete
-não existir; se existir, sempre reproduz — nunca faz uma chamada real de
-novo sem apagar o arquivo manualmente.
+antes de gravar, então a chave real nunca fica no cassete de qualquer
+forma. `record_mode="once"`: grava só se o cassete não existir; se
+existir, sempre reproduz — nunca faz uma chamada real de novo sem apagar
+o arquivo manualmente.
+
+`real_embedding_provider`/`real_chat_provider` (`conftest.py`) caem para
+uma chave fake (`"sk-fake-key-for-vcr-replay"`) quando
+`settings.openai_api_key` está vazia — o `__init__` dos providers reais
+só valida que a chave não é vazia, nunca faz uma chamada de verdade
+nesse momento; a chamada HTTP real (que exigiria uma chave válida) só
+aconteceria se o VCR não encontrasse o cassete, e nesse caso o teste deve
+mesmo falhar (sinal de que o cassete sumiu ou ficou desatualizado, não
+algo pra mascarar). CI roda com `OPENAI_API_KEY=""` de propósito — sem
+esse fallback e sem os cassetes versionados, os dois testes VCR nunca
+passariam lá.
 
 **Para gravar (ou re-gravar) os cassetes**, apague o(s) arquivo(s) em
 `tests/cassettes/` e rode a suite normalmente com uma
