@@ -15,4 +15,4 @@ class PdfParser:
         text, num_pages = parse_pdf(content)
         if num_pages > settings.max_pdf_pages:
             raise DocumentTooManyPagesError(num_pages, settings.max_pdf_pages)
-        return text  # pragma: no cover — ver docs/testes.md (mesmo bug de app/api/documents.py)
+        return text

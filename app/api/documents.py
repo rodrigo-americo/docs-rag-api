@@ -50,17 +50,7 @@ def get_session_factory() -> Callable[[], AsyncSession]:
     response_model=list[DocumentSummary],
     summary="Lista de documentos indexados",
 )
-# coverage.py nunca marca como executado o corpo de nenhum handler deste
-# arquivo a partir daqui — motivo não identificado após investigação
-# extensa (bytecode, plataforma Windows/Linux, decorators, middleware),
-# apesar de confirmado com print() de debug que o código roda de verdade
-# e a suite (test_documents_crud.py, test_ingest_endpoint.py) passa
-# normalmente. Mesmo padrão estrutural (async def + Depends + raise
-# HTTPException) funciona corretamente em app/api/health.py e
-# app/api/query.py — ver docs/testes.md para o registro completo da
-# investigação. Todo `# pragma: no cover` abaixo existe por causa disso,
-# não por falta de teste real.
-async def list_documents(  # pragma: no cover
+async def list_documents(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[DocumentSummary]:
     stmt = select(Document).order_by(Document.created_at.desc())
@@ -84,7 +74,7 @@ async def list_documents(  # pragma: no cover
     response_model=DocumentSummary,
     summary="Consulta um documento e seu status de processamento",
 )
-async def get_document(  # pragma: no cover
+async def get_document(
     document_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
 ) -> DocumentSummary:
@@ -109,7 +99,7 @@ async def get_document(  # pragma: no cover
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove um documento e seus chunks",
 )
-async def delete_document(  # pragma: no cover
+async def delete_document(
     document_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
@@ -130,7 +120,7 @@ async def delete_document(  # pragma: no cover
     summary="Ingere um arquivo PDF, MD ou TXT",
 )
 @limiter.limit(settings.rate_limit_ingest)
-async def ingest_document(  # pragma: no cover
+async def ingest_document(
     request: Request,
     file: UploadFile = File(...),
     title: str | None = Form(None),

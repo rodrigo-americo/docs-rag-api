@@ -84,13 +84,7 @@ class OpenAIChatProvider:
         response = await self._client.ainvoke(messages)
         return response.content
 
-    async def complete_structured(  # pragma: no cover
-        self, prompt: str, *, system: str, schema: type[T]
-    ) -> T:
-        # Exercitado de verdade por test_query_returns_answer_with_real_openai
-        # (VCR, cassete com chamadas reais gravadas) — coverage.py não marca
-        # este corpo como executado por motivo não identificado, mesmo bug
-        # isolado em app/api/documents.py (ver docs/testes.md).
+    async def complete_structured(self, prompt: str, *, system: str, schema: type[T]) -> T:
         from langchain_core.messages import HumanMessage, SystemMessage
 
         messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
