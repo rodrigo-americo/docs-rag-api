@@ -29,15 +29,33 @@ def test_configure_tracing_sets_env_vars_when_enabled(monkeypatch):
 
 
 def test_configure_logging_with_json_format_configures_root_logger(monkeypatch):
-    """log_format="json" (branch nunca exercitado — .env local usa
-    "console", CI usa "json" mas nunca os dois na mesma suite). Restaura
-    os handlers originais do root logger no fim: configure_logging() faz
+    """log_format="json" — sem este teste explícito, o branch só seria
+    exercitado organicamente se o ambiente rodando a suite tivesse
+    LOG_FORMAT=json (o caso do CI, mas não do .env local, que usa
+    "console" — os dois nunca coincidem na mesma execução). Restaura os
+    handlers originais do root logger no fim: configure_logging() faz
     root_logger.handlers.clear() + adiciona um StreamHandler novo — sem
     restaurar, isso quebraria capsys de testes que rodarem depois na
     mesma suite (mesmo mecanismo que corrompeu test_query_endpoint.py
     quando lifespan() chamava configure_logging() sem mock, ver
     test_main_lifespan.py)."""
     monkeypatch.setattr(settings, "log_format", "json")
+    root_logger = logging.getLogger()
+    original_handlers = list(root_logger.handlers)
+    try:
+        configure_logging()
+        assert len(root_logger.handlers) == 1
+    finally:
+        root_logger.handlers.clear()
+        root_logger.handlers.extend(original_handlers)
+
+
+def test_configure_logging_with_console_format_configures_root_logger(monkeypatch):
+    """log_format="console" — espelho do teste acima, mesmo raciocínio
+    invertido: sem isso, o branch só seria exercitado organicamente se o
+    ambiente tivesse LOG_FORMAT=console (o .env local, mas não o CI, que
+    roda com LOG_FORMAT=json)."""
+    monkeypatch.setattr(settings, "log_format", "console")
     root_logger = logging.getLogger()
     original_handlers = list(root_logger.handlers)
     try:
