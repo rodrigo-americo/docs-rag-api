@@ -25,6 +25,26 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # postgres_test: banco separado do "docsrag" acima, no lugar de um
+      # segundo container — a suite faz TRUNCATE a cada teste (ver
+      # tests/conftest.py) e nunca deve tocar o mesmo banco usado por outro
+      # step. Efêmero por container do job, então o isolamento aqui é mais
+      # sobre correção de configuração (não deixar TEST_DATABASE_URL ==
+      # DATABASE_URL passar despercebido) do que sobre proteger dados reais.
+      postgres_test:
+        image: pgvector/pgvector:0.8.2-pg16-bookworm
+        env:
+          POSTGRES_USER: docsrag
+          POSTGRES_PASSWORD: docsrag
+          POSTGRES_DB: docsrag_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U docsrag -d docsrag_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
       redis:
         image: redis:7-alpine
         ports:
@@ -37,6 +57,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://docsrag:docsrag@localhost:5432/docsrag
+      TEST_DATABASE_URL: postgresql+asyncpg://docsrag:docsrag@localhost:5433/docsrag_test
       REDIS_URL: redis://localhost:6379/0
       UPLOADS_DIR: /tmp/docs-rag-uploads-ci
       EMBEDDING_PROVIDER: fake
@@ -64,13 +85,30 @@ jobs:
       - name: Format check (ruff format)
         run: uv run ruff format --check .
 
-      - name: Run migrations
+      - name: Run migrations (banco de dev/produção)
+        run: uv run alembic upgrade head
+
+      - name: Run migrations (banco de teste)
+        # alembic/env.py sempre lê settings.database_url_sync — sobrepõe
+        # DATABASE_URL só neste step pra aplicar o mesmo schema em
+        # docsrag_test, que tests/conftest.py exige via TEST_DATABASE_URL.
+        env:
+          DATABASE_URL: postgresql+asyncpg://docsrag:docsrag@localhost:5433/docsrag_test
         run: uv run alembic upgrade head
 
       - name: Run tests (queue_backend=inline, padrão)
-        run: uv run pytest --ignore=tests/test_worker_integration.py
+        # --cov-fail-under=0 sobrepõe o fail_under=100 do pyproject.toml só
+        # neste step: cobertura é cumulativa entre os dois steps de teste
+        # (--cov-append no segundo), e boa parte do código só é alcançável
+        # em QUEUE_BACKEND=redis (ver docs/testes.md) — falhar aqui, antes
+        # de somar o segundo step, rejeitaria até uma suite 100% cobrindo
+        # o sistema inteiro.
+        run: uv run pytest --ignore=tests/test_worker_integration.py --cov=app --cov-fail-under=0
 
       - name: Run worker integration tests (fila real via Redis)
+        # Gate real de cobertura (100%, de pyproject.toml) roda aqui —
+        # --cov-append soma ao .coverage do step anterior antes de avaliar
+        # fail_under contra o total combinado dos dois modos.
         env:
           QUEUE_BACKEND: redis
-        run: uv run pytest tests/test_worker_integration.py -v
+        run: uv run pytest tests/test_worker_integration.py -v --cov=app --cov-append --cov-report=term-missing

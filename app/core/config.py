@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     database_url: str = Field(
         ..., description="URL do Postgres com driver async (postgresql+asyncpg)"
     )
+    # Só lida por tests/conftest.py — banco separado do de dev/produção
+    # acima, pra suite de teste (que faz TRUNCATE a cada teste) nunca
+    # apagar dados reais por engano. Vazia por padrão porque só é
+    # obrigatória ao rodar pytest, não ao subir a aplicação normalmente.
+    test_database_url: str = Field(
+        "", description="URL do Postgres de teste — deve ser um banco separado do de dev"
+    )
 
     # --- OpenAI ---
     # Vazia por padrão: só é obrigatória quando embedding_provider="openai"

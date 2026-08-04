@@ -15,14 +15,31 @@ from app.api.query import get_chat, get_embedding
 from app.core.config import settings
 from app.core.db import get_db_session
 from app.main import app
-from app.services.chat import FakeChatProvider
-from app.services.embedding import FakeEmbeddingProvider
+from app.services.chat import FakeChatProvider, OpenAIChatProvider
+from app.services.embedding import FakeEmbeddingProvider, OpenAIEmbeddingProvider
+
+# A suite faz TRUNCATE a cada teste (_clean_tables abaixo) — rodar isso
+# contra settings.database_url apagaria dados de dev/produção sem aviso.
+# TEST_DATABASE_URL é obrigatória e precisa apontar pra um banco diferente;
+# falha alto aqui em vez de silenciosamente truncar o banco errado.
+if not settings.test_database_url:
+    raise RuntimeError(
+        "TEST_DATABASE_URL não configurada — necessária pra rodar a suite de "
+        "teste sem apagar o banco de dev (que TRUNCATE a cada teste tocaria "
+        "se caísse em settings.database_url). Ver docs/testes.md."
+    )
+if settings.test_database_url == settings.database_url:
+    raise RuntimeError(
+        "TEST_DATABASE_URL é igual a DATABASE_URL — a suite de teste faz "
+        "TRUNCATE a cada teste e apagaria o banco de dev. Aponte "
+        "TEST_DATABASE_URL para um banco separado (ver docs/testes.md)."
+    )
 
 # NullPool: sem conexões persistentes entre requests. Cada operação abre e
 # fecha sua própria conexão dentro do event loop atual — evita o clássico
 # "Future attached to a different loop" que aparece quando um pool global
 # (criado em app.core.db, no import-time) sobrevive entre loops de teste.
-_test_engine = create_async_engine(settings.database_url, poolclass=NullPool)
+_test_engine = create_async_engine(settings.test_database_url, poolclass=NullPool)
 _TestSessionLocal = async_sessionmaker(bind=_test_engine, expire_on_commit=False, autoflush=False)
 
 
@@ -58,6 +75,24 @@ app.state.limiter.enabled = False
 app.dependency_overrides[get_chat] = lambda: FakeChatProvider()
 app.dependency_overrides[get_embedding] = lambda: FakeEmbeddingProvider()
 app.dependency_overrides[get_embedding_for_ingest] = lambda: FakeEmbeddingProvider()
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _dispose_test_engine():
+    """Descarta _test_engine ao fim da suite inteira.
+
+    Sem isso, as conexões TCP que o asyncpg abre por trás do NullPool
+    (uma por operação, nunca reaproveitada — daí NullPool) não são
+    fechadas de forma determinística: sobrevivem até o garbage collector
+    do Python rodar, o que pode acontecer só depois do pytest já estar no
+    próprio processo de shutdown. filterwarnings=["error"] (pyproject.toml)
+    promove o ResourceWarning resultante a erro fatal nesse momento,
+    derrubando a suite inteira de forma intermitente mesmo com todo teste
+    tendo passado — reproduzido tanto em Windows quanto em Linux (dentro
+    do container `test`, ver docs/testes.md), não é peculiaridade de SO.
+    """
+    yield
+    await _test_engine.dispose()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -106,6 +141,37 @@ async def wait_until(
             return
         await asyncio.sleep(interval)
     raise TimeoutError(f"condição não satisfeita após {timeout}s")
+
+
+@pytest.fixture(scope="module")
+def vcr_config() -> dict:
+    """Config do pytest-recording (vcrpy) pra testes marcados com @pytest.mark.vcr.
+
+    filter_headers evita gravar a API key real dentro do cassete — sem isso,
+    tests/cassettes/*.yaml (versionado no repo, embora ignorado via
+    .gitignore aqui) carregaria o segredo em texto puro.
+    """
+    return {
+        "filter_headers": [("authorization", "REDACTED"), ("openai-organization", "REDACTED")],
+        "record_mode": "once",
+    }
+
+
+@pytest.fixture
+def real_embedding_provider() -> OpenAIEmbeddingProvider:
+    """Provider real de embedding, só para testes @pytest.mark.vcr — cobre o
+    contrato de resposta de verdade da API da OpenAI (ver
+    docs/roadmap.md, trilha 'infraestrutura de teste')."""
+    return OpenAIEmbeddingProvider(
+        api_key=settings.openai_api_key, model=settings.openai_embedding_model
+    )
+
+
+@pytest.fixture
+def real_chat_provider() -> OpenAIChatProvider:
+    """Provider real de chat, só para testes @pytest.mark.vcr — mesmo
+    raciocínio de real_embedding_provider."""
+    return OpenAIChatProvider(api_key=settings.openai_api_key, model=settings.openai_chat_model)
 
 
 @pytest.fixture

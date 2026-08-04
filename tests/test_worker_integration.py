@@ -32,8 +32,14 @@ async def worker_task():
     teste: o cancelamento propaga pro `finally` de run(), que fecha a
     conexão Redis e o engine do worker de forma limpa (mesmo caminho que
     um `docker stop` exercitaria em produção).
+
+    session_factory=TestSessionLocal (TEST_DATABASE_URL) é obrigatório
+    aqui: run() sem argumento cria seu próprio engine a partir de
+    settings.database_url (banco de dev), que desde a separação
+    dev/teste não é mais o mesmo banco onde este teste insere o
+    Document — o worker nunca acharia o documento (ver docs/testes.md).
     """
-    task = asyncio.create_task(run())
+    task = asyncio.create_task(run(session_factory=TestSessionLocal))
     yield task
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
@@ -72,6 +78,31 @@ async def test_message_travels_through_real_redis_to_a_real_worker(worker_task, 
     async with TestSessionLocal() as session:
         doc = await session.get(Document, result.document_id)
         assert doc.status == DocumentStatus.INDEXED
+
+
+async def test_run_without_session_factory_creates_its_own_engine_from_settings(monkeypatch):
+    """session_factory=None é o caminho de produção real (python -m
+    app.worker) — cria seu próprio engine a partir de settings.database_url
+    (ver docstring de run()), diferente de worker_task acima (que sempre
+    injeta TestSessionLocal). Aponta settings.database_url pro banco de
+    teste só pra este teste não usar o banco de dev, sem testar
+    session_factory=TestSessionLocal (que é o próprio worker_task).
+
+    Não enfileira nada: exercita também dequeue() retornando None (fila
+    vazia) → continue no loop principal — dequeue() usa timeout=5
+    hardcoded (não configurável via settings). Espera 8s, não só 6s: o
+    setup do próprio run() (criar engine, pool_pre_ping na primeira
+    conexão) consome parte do tempo antes do primeiro dequeue começar a
+    contar, e 6s às vezes não sobra margem suficiente pra completar um
+    ciclo vazio inteiro antes do cancel (observado localmente, mesmo
+    passando sempre em CI/Docker — timing de scheduler, não lógica)."""
+    monkeypatch.setattr(settings, "database_url", settings.test_database_url)
+
+    task = asyncio.create_task(run())
+    await asyncio.sleep(8)
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 
 async def test_document_that_always_fails_is_retried_then_marked_failed(worker_task):

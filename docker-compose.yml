@@ -20,6 +20,10 @@ services:
       # Volume nomeado: sobrevive a `docker compose down`.
       # Pra wipe limpo: `docker compose down -v` (note o -v).
       - postgres_data:/var/lib/postgresql/data
+      # Roda só na primeira inicialização (volume vazio) — cria
+      # "${POSTGRES_DB}_test" pra suite de teste nunca truncar dados de dev
+      # (ver tests/conftest.py e docs/testes.md).
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       # pg_isready vem no PATH da imagem oficial. Checa se o postmaster
       # está aceitando conexão — diferente de só "o container está up".
@@ -103,6 +107,44 @@ services:
     # Dois serviços rodando "alembic upgrade head" ao mesmo tempo na
     # inicialização é uma corrida desnecessária — só um precisa migrar.
     command: uv run --frozen --no-sync python -m app.worker
+
+  test:
+    build:
+      context: .
+      target: test
+    container_name: docs-rag-test
+    env_file:
+      - .env
+    environment:
+      # Ambos apontam pro mesmo Postgres do compose (rede interna), bancos
+      # diferentes — docsrag_test é criado automaticamente por
+      # docker/postgres-init/01-create-test-db.sh na primeira subida do
+      # volume postgres_data. Ver docs/testes.md sobre por que
+      # TEST_DATABASE_URL precisa ser diferente de DATABASE_URL.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}_test
+      REDIS_URL: redis://redis:6379/0
+      UPLOADS_DIR: /tmp/docs-rag-uploads-test
+      EMBEDDING_PROVIDER: fake
+      CHAT_PROVIDER: fake
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Roda em Linux (o mesmo SO do CI), não Windows — evita o flake de
+    # ResourceWarning em sockets asyncio que o proactor do Windows produz
+    # (ver docs/testes.md). Migrations em ambos os bancos antes da suite:
+    # alembic/env.py sempre lê DATABASE_URL, então o banco de teste precisa
+    # de uma segunda invocação sobrepondo a env var só para esse comando.
+    # --profile test (não sobe com "docker compose up" normal): este
+    # serviço roda a suite e termina, não é um servidor de vida longa.
+    profiles: ["test"]
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             DATABASE_URL=$$TEST_DATABASE_URL uv run alembic upgrade head &&
+             uv run pytest --ignore=tests/test_worker_integration.py --cov=app --cov-fail-under=0 &&
+             QUEUE_BACKEND=redis uv run pytest tests/test_worker_integration.py -v --cov=app --cov-append --cov-report=term-missing"
 
 volumes:
   postgres_data:

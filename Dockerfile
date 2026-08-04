@@ -22,3 +22,15 @@ RUN uv sync --frozen --no-dev
 EXPOSE 8000
 
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# --- estágio de teste ---
+# Só usado pelo serviço `test` do docker-compose.yml — roda a suite dentro
+# de Linux (o mesmo SO do CI), não Windows, onde o proactor do asyncio tem
+# comportamento diferente de coleta de warnings de socket (ver
+# docs/testes.md). Camada extra em cima de `base`: reusa tudo que já foi
+# instalado ali, só adiciona o grupo dev (pytest, ruff etc.) que a imagem
+# de produção deliberadamente não tem.
+FROM base AS test
+RUN uv sync --frozen
+
+CMD ["uv", "run", "pytest"]

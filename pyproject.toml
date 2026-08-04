@@ -51,6 +51,7 @@ dev = [
     "pytest-recording>=0.13,<1.0",         # VCR — grava chamadas reais
     "httpx>=0.28,<1.0",                    # Cliente pros testes da API (FastAPI TestClient async)
     "vcrpy>=6.0,<7.0",                     # Dependência transitiva, mas pino pra controlar
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]
@@ -70,6 +71,18 @@ python_files = ["test_*.py"]
 filterwarnings = [
     "error",                                # Warnings viram erros — pega deprecation cedo
     "ignore::DeprecationWarning:passlib.*", # Whitelist específica se precisar
+    # NullPool (tests/conftest.py) + asyncpg + event loop novo por teste
+    # (pytest-asyncio, function-scoped) deixa conexões TCP em processo de
+    # fechamento no momento em que um teste termina e o próximo começa —
+    # o GC as coleta de forma não-determinística, às vezes só no cleanup
+    # final do próprio pytest, gerando ResourceWarning ali. Investigado a
+    # fundo (não é um teste específico com bug: reproduzido isolando
+    # arquivos, em Windows E em Linux/Docker) — é característica de fundo
+    # dessa combinação de stack, não um recurso real vazando por descuido
+    # de código. Sem esta exceção, filterwarnings=["error"] promove isso a
+    # falha fatal intermitente e não-relacionada ao teste que "falha" (ver
+    # docs/testes.md).
+    "ignore::ResourceWarning",
 ]
 
 # --- ruff ---
@@ -94,3 +107,37 @@ ignore = [
 # Default do ruff format (estilo black): aspas duplas, indent de 4 espaços,
 # trailing commas normalizadas. Sem overrides — o default já é o que o
 # projeto vinha tentando seguir manualmente.
+
+# --- coverage ---
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+# Meta é 100% do que é logicamente testável — as exclusões abaixo são
+# padrões estruturais (nunca chamados sob pytest, ou puro entrypoint sem
+# decisão a testar), não uma forma de esconder lógica de negócio não
+# coberta. Cada uma tem que continuar sendo justificável linha a linha,
+# não um jeito de baixar a meta.
+exclude_lines = [
+    "pragma: no cover",
+    # Entrypoint de processo — nunca executa sob pytest (importar o módulo
+    # não dispara isso), só quando o arquivo roda como script.
+    "if __name__ == .__main__.:",
+    # assert de invariante interna (bug de programação, não caminho de
+    # runtime alcançável por input externo) — ver app/services/ingest.py.
+    "raise NotImplementedError",
+    # Corpo de método dentro de um typing.Protocol (ex:
+    # app/services/parsers/base.py, app/core/queue.py::QueueClient) —
+    # assinatura de interface pra structural typing, nunca instanciado nem
+    # chamado em runtime. Cobre tanto "..." numa linha própria quanto
+    # "def foo(...): ..." numa linha só — restrito ao literal "..." pra
+    # não mascarar um corpo real que por acaso contenha reticências.
+    "^\\s*\\.\\.\\.\\s*$",
+    "\\bdef .*: \\.\\.\\.$",
+]
+fail_under = 100
+show_missing = true
+
+[tool.coverage.html]
+directory = "htmlcov"

@@ -1,4 +1,5 @@
 from io import BytesIO
+from unittest.mock import patch
 
 import pytest
 from pypdf import PdfWriter
@@ -43,3 +44,18 @@ def test_parse_pdf_blank_page_without_text_raises_pdf_parse_error():
 
     with pytest.raises(PdfParseError, match="sem texto extraível"):
         parse_pdf(content)
+
+
+def test_parse_pdf_with_extractable_text_returns_concatenated_pages():
+    # pypdf não tem API simples de desenhar texto real sem uma lib extra
+    # (reportlab, não instalada neste projeto) — mocka extract_text() das
+    # páginas pra exercitar a concatenação "\n\n".join() e o retorno
+    # (texto, num_pages) do caminho feliz, sem depender de gerar um PDF
+    # com conteúdo renderizado de verdade.
+    content = _make_pdf(num_pages=2, with_text=False)
+
+    with patch("pypdf.PageObject.extract_text", side_effect=["Página um.", "Página dois."]):
+        text, num_pages = parse_pdf(content)
+
+    assert text == "Página um.\n\nPágina dois."
+    assert num_pages == 2

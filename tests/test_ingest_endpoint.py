@@ -1,4 +1,5 @@
 import httpx
+import pytest
 from openai import APIConnectionError
 
 from app.api.documents import get_embedding
@@ -142,6 +143,69 @@ async def test_ingest_corrupted_pdf_marks_document_as_failed(client):
     documents = list_response.json()
     assert len(documents) == 1
     assert documents[0]["status"] == "failed"
+
+
+@pytest.mark.vcr
+async def test_ingest_txt_succeeds_with_real_openai_embedding(
+    client, sample_txt_bytes, real_embedding_provider
+):
+    """Cobre o contrato real de resposta da API de embeddings da OpenAI —
+    diferente do resto da suite (Fake*Provider), aqui o schema e o formato
+    de erro são os do SDK de verdade, gravados uma vez via VCR (ver
+    docs/roadmap.md, trilha 'infraestrutura de teste')."""
+    previous_override = app.dependency_overrides[get_embedding]
+    app.dependency_overrides[get_embedding] = lambda: real_embedding_provider
+    try:
+        response = await client.post(
+            "/documents/ingest",
+            files={"file": ("contrato.txt", sample_txt_bytes, "text/plain")},
+            data={"title": "Contrato de Teste"},
+        )
+    finally:
+        app.dependency_overrides[get_embedding] = previous_override
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "pending"
+
+    list_response = await client.get("/documents")
+    documents = list_response.json()
+    assert len(documents) == 1
+    assert documents[0]["status"] == "indexed"
+
+
+async def test_ingest_rejects_file_larger_than_max_upload_size(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "max_upload_size_mb", 0)
+
+    response = await client.post(
+        "/documents/ingest",
+        files={"file": ("grande.txt", b"conteudo qualquer, ainda que pequeno", "text/plain")},
+    )
+
+    assert response.status_code == 413
+
+
+async def test_ingest_returns_503_when_redis_queue_is_unavailable(
+    client, sample_txt_bytes, monkeypatch
+):
+    """queue_backend=redis mas app.state.redis_client é None — mesmo caso
+    que ASGITransport produz de verdade (lifespan não roda em teste), sem
+    precisar derrubar um Redis real pra provocar. Ver comentário em
+    app/api/documents.py sobre por que None é tratado como fila indisponível."""
+    from app.core.config import settings
+    from app.main import app
+
+    monkeypatch.setattr(settings, "queue_backend", "redis")
+    assert app.state.redis_client is None
+
+    response = await client.post(
+        "/documents/ingest",
+        files={"file": ("doc.txt", sample_txt_bytes, "text/plain")},
+    )
+
+    assert response.status_code == 503
 
 
 async def test_ingest_marks_document_as_failed_for_prompt_injection_attempt(client):

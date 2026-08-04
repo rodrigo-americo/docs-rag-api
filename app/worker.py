@@ -1,7 +1,8 @@
 import asyncio
 import uuid
+from collections.abc import Callable
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -14,15 +15,28 @@ from app.services.ingest import IngestService
 log = get_logger(__name__)
 
 
-async def run() -> None:
+async def run(session_factory: Callable[[], AsyncSession] | None = None) -> None:
+    """`session_factory=None` (produção, `app.worker.__main__`): cria
+    engine/session factory próprios a partir de `settings.database_url` —
+    não reusa `app.core.db.AsyncSessionLocal`, criado no event loop de quem
+    importou aquele módulo primeiro (poderia não ser o loop do
+    `asyncio.run()` abaixo). Dono desse engine é esta função, por isso
+    descarta no `finally`.
+
+    `session_factory` explícito (só `tests/test_worker_integration.py`,
+    que sobe este `run()` como task no mesmo processo/loop do pytest):
+    injeta a session factory de teste (`TEST_DATABASE_URL`, não
+    `settings.database_url`) — o worker de teste não é dono desse engine
+    (o `conftest.py` é, e precisa dele vivo entre testes), então não o
+    descarta.
+    """
     configure_logging()
     log.info("worker.startup", queue=settings.ingest_queue_name)
 
-    # Engine/session factory PRÓPRIOS do worker — não reusa
-    # app.core.db.AsyncSessionLocal, criado no event loop de quem importou
-    # aquele módulo primeiro (poderia não ser o loop do asyncio.run() abaixo).
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    engine = None
+    if session_factory is None:
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        session_factory = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
 
     service = IngestService(
         embedding_provider=get_embedding_provider(), session_factory=session_factory
@@ -53,7 +67,8 @@ async def run() -> None:
                 await ack(redis_client, raw_payload)
     finally:
         await redis_client.aclose()
-        await engine.dispose()
+        if engine is not None:
+            await engine.dispose()
 
 
 if __name__ == "__main__":
