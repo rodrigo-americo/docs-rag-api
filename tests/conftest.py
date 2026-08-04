@@ -161,9 +161,16 @@ def vcr_config() -> dict:
 def real_embedding_provider() -> OpenAIEmbeddingProvider:
     """Provider real de embedding, só para testes @pytest.mark.vcr — cobre o
     contrato de resposta de verdade da API da OpenAI (ver
-    docs/roadmap.md, trilha 'infraestrutura de teste')."""
+    docs/roadmap.md, trilha 'infraestrutura de teste').
+
+    api_key usa um fallback fake quando settings.openai_api_key está vazia
+    (ex: CI, que deliberadamente roda com OPENAI_API_KEY="" pra nunca gastar
+    de verdade) — o __init__ do provider só valida que a chave não é vazia,
+    e a chamada HTTP real nunca sai porque o VCR intercepta e reproduz o
+    cassete já gravado antes dela acontecer."""
     return OpenAIEmbeddingProvider(
-        api_key=settings.openai_api_key, model=settings.openai_embedding_model
+        api_key=settings.openai_api_key or "sk-fake-key-for-vcr-replay",
+        model=settings.openai_embedding_model,
     )
 
 
@@ -171,7 +178,10 @@ def real_embedding_provider() -> OpenAIEmbeddingProvider:
 def real_chat_provider() -> OpenAIChatProvider:
     """Provider real de chat, só para testes @pytest.mark.vcr — mesmo
     raciocínio de real_embedding_provider."""
-    return OpenAIChatProvider(api_key=settings.openai_api_key, model=settings.openai_chat_model)
+    return OpenAIChatProvider(
+        api_key=settings.openai_api_key or "sk-fake-key-for-vcr-replay",
+        model=settings.openai_chat_model,
+    )
 
 
 @pytest.fixture
