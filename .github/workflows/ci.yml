@@ -109,6 +109,11 @@ jobs:
         # Gate real de cobertura (100%, de pyproject.toml) roda aqui —
         # --cov-append soma ao .coverage do step anterior antes de avaliar
         # fail_under contra o total combinado dos dois modos.
+        # WORKER_METRICS_PORT=0 desliga start_http_server (app/worker.py):
+        # este step sobe múltiplas instâncias de run() no mesmo processo
+        # pytest (ver tests/test_worker_integration.py) — todas na mesma
+        # porta fixa colidiriam (OSError: Address already in use).
         env:
           QUEUE_BACKEND: redis
-        run: uv run pytest tests/test_worker_integration.py -v --cov=app --cov-append --cov-report=term-missing
+          WORKER_METRICS_PORT: "0"
+        run: uv run pytest tests/test_worker_integration.py tests/test_metrics.py -v --cov=app --cov-append --cov-report=term-missing
